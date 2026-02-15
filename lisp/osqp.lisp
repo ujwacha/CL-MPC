@@ -1,3 +1,4 @@
+;; this is for interfacing C with Common lisp
 (require 'asdf)
 (asdf:load-system :cl-autowrap)
 (asdf:load-system :cffi)
