@@ -149,12 +149,28 @@
      (list ,@(mapcar (lambda (row) (cons 'list row)) matrix))))
 
 
- (compile 'my-jacobian (get-lambda '(x v theta omega a) a-mat))
+(compile 'my-jacobian (get-lambda '(x v theta omega a) a-mat))
 
 
 (my-jacobian 0 0 0 0 0)
 
 (get-lambda '(x v theta omega a) a-mat)
 
+(defvar my-test-state '(a b c d))
+(jacobian my-test-state '((+ a b c)))
+;; Jacobian is calculated in row way, not in column way
 
+(defun state-limit-symbolic->list (state-vector u inequality l)
+  (list u
+	(jacobian state-vector inequality)
+	l))
+
+(state-limit-symbolic->list my-test-state
+			    -0.1
+			    '((+ (* 2 a) (* 3 b) (* (sin t) c ) d))
+			    2.4
+			    )
+
+
+(jacobian my-test-state '((+ (* 2 a) (* 3 b) (* (sin t) c ) d)))
 a-mat
