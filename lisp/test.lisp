@@ -47,3 +47,18 @@
 						 '(0 0 0 0)
 						 controls)))))
 
+
+(print
+ (time 
+  (progn 
+
+    (defvar A-this (funcall *a-fn* 0 0 0 0 0))
+
+    (defvar B-this (funcall *b-fn* 0 0 0 0 0))
+
+    (car (get-sparse-a-l-u 1
+			   A-this
+			   B-this
+			   states
+			   '(0 0 0 0)
+			   controls)))))

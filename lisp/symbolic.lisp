@@ -1,19 +1,19 @@
-;;; symbolic.lisp - Symbolic differentiation and Jacobian utilities
+;; ;;; symbolic.lisp - Symbolic differentiation and Jacobian utilities
 
-(defpackage :mpc-control.symbolic
-  (:use :cl)
-  (:export
-   ;; Core differentiation
-   :diff
-   :simplify
-   :jacobian
-   :variadic->binary
-   ;; Lambda generation
-   :get-lambda
-   ;; State management (if needed)
-   ))
+;; (defpackage :mpc-control.symbolic
+;;   (:use :cl)
+;;   (:export
+;;    ;; Core differentiation
+;;    :diff
+;;    :simplify
+;;    :jacobian
+;;    :variadic->binary
+;;    ;; Lambda generation
+;;    :get-lambda
+;;    ;; State management (if needed)
+;;    ))
 
-(in-package :mpc-control.symbolic)
+;; (in-package :mpc-control.symbolic)
 
 
 
@@ -95,11 +95,11 @@
 
 
 (defun jacobian (state transition)
-  (mapcar (lambda (var)
-            (mapcar (lambda (trans)
+  (mapcar (lambda (trans)
+            (mapcar (lambda (var)
 		      (simplify  (diff trans var)))
-                    transition))
-          state))
+                    state))
+          transition))
 
 
 (jacobian
@@ -178,6 +178,8 @@
 (defvar my-test-state '(a b c d))
 (jacobian my-test-state '((+ a b c)))
 ;; Jacobian is calculated in row way, not in column way
+
+(require :ALEXANDRIA)
 
 (defun state-limit-symbolic->list (state-vector u inequality l)
   (list u

@@ -24,8 +24,8 @@
    ;; Lisp
    sbcl
    (list sbcl "doc")
-   sbcl-alexandria
-   sbcl-cffi
+   cl-alexandria
+   cl-cffi
    cl-autowrap
    cl-asdf
    

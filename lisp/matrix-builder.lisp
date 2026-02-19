@@ -1,27 +1,22 @@
-
-(defpackage :mpc-control.matrix-builder
-  (:use :cl :alexandria :mpc-control.symbolic)
-  (:export
-   ;; Core matrix builders
-   :get-p
-   :get-q
-   :get-a-l-u-matrix
-   ;; CSC conversion
-   :list-matrix->csc-list
-   :number-grouper
-   ;; Matrix utilities
-   :insert-matrix
-   :identity-matrix-nil
-   :mat-constant-mul
-   :range-get
-   :make-list-filled))
-
-(in-package :mpc-control.matrix-builder)
+;; (defpackage :mpc-control.matrix-builder
+;;   (:use :cl :alexandria :mpc-control.symbolic)
+;;   (:export
+;;    ;; Core matrix builders
+;;    :get-p
+;;    :get-q
+;;    :get-a-l-u-matrix
+;;    ;; CSC conversion
+;;    :list-matrix->csc-list
+;;    :number-grouper
+;;    ;; Matrix utilities
+;;    :insert-matrix
+;;    :identity-matrix-nil
+;;    :mat-constant-mul
+;;    :range-get
+;;    :make-list-filled))
 
 
-
-
-
+(require :alexandria)
 
 (defvar A '((1 3) (2 4)))
 
@@ -36,10 +31,13 @@
 ;; firstly let's define horizon
 (defvar N 2)
 
+(defun range-get (l g) 
+  (loop for i from l below g collect i))
+
 ;; let's make the cost function
 ;; let's not worry about V here,
 (defun get-trajectory(N)
-  (mapcar (lambda (x) `(,x 0)) (make-list (+ N 1) :initial-element 1)))
+  (mapcar (lambda (x) `(,x 0)) (range-get 1 (+ N 1))))
 
 
 (defun get-q (time-horizon trajectory initial-state state-symbols control-symbols)
@@ -52,10 +50,7 @@
 		 (concatenate 'list initial-state traj
 			      (mapcar (lambda (x)
 					(make-list  (length control-symbols) :initial-element 0))
-				      (make-list time-horizon :initial-element 0))))))))
-
-
-
+				      (range-get 0 time-horizon))))))))
 
 (get-q 2
        (get-trajectory 2)
@@ -201,6 +196,10 @@
 (get-trajectory 2)
 
 
+
+
+
+
 (defun get-a-l-u-matrix (time-horizon
 			 state-jacobian
 			 control-jacobian
@@ -247,7 +246,7 @@
 							 (* i state-len))
 						      (* i state-len))))
 					  (list pos (mat-constant-mul -1  state-jacobian))))
-				      (make-list time-horizon :initial-element 0 )))
+				      (range-get 0 time-horizon)))
 
 	 (control-jacobian-list (mapcar (lambda (i)
 					  (let ((pos
@@ -256,7 +255,7 @@
 							(+ control-jac-offset-col
 							   (* i control-len)))))
 					    (list pos (mat-constant-mul -1  control-jacobian))))
-					(make-list time-horizon :initial-element 0 )))
+					(range-get 0 time-horizon)))
 
 	 (state-limit-list (if (eq state-limits 'nil) ()
 			       (loop for i from 0 below time-horizon
@@ -265,7 +264,7 @@
 						      (* (+ i 1) state-len))))
 				       (list pos (nth 1 state-limits))))))
 	 ) 
-;;    state-limit-list
+    ;;    state-limit-list
     (let ((A (reduce
 	      (lambda (initial-matrix pos-smatrix)
 		(destructuring-bind (pos smatrix) pos-smatrix
@@ -279,7 +278,7 @@
 			  (alexandria:flatten 
 			   (mapcar (lambda (unused)
 				     (make-list  state-len :initial-element 0))
-				   (make-list time-horizon :initial-element 0 )))
+				   (range-get 0 time-horizon)))
 			  (alexandria:flatten 
 			   (mapcar (lambda (unused)
 				     (if (and  (listp control-limits)
@@ -289,14 +288,14 @@
 						  (length (cadr control-limits))))
 					 (car control-limits)
 					 (make-list  control-len :initial-element -1000.0)))
-				   (make-list time-horizon :initial-element 0 )))
+				   (range-get 0 time-horizon)))
 			  (make-list  time-horizon :initial-element (nth 0 state-limits))
 			  ))
 	  (U (concatenate 'list current-state
 			  (alexandria:flatten 
 			   (mapcar (lambda (unused)
 				     (make-list  state-len :initial-element 0))
-				   (make-list time-horizon :initial-element 0 )))
+				   (range-get 0 time-horizon)))
 			  (alexandria:flatten 
 			   (mapcar (lambda (unused)
 				     (if (and  (listp control-limits)
@@ -306,7 +305,7 @@
 						  (length (cadr control-limits))))
 					 (cadr control-limits)
 					 (make-list  control-len :initial-element +1000.0)))
-				   (make-list time-horizon :initial-element 0 )))
+				   (range-get 0 time-horizon)))
 			  (make-list  time-horizon :initial-element (nth 2 state-limits))
 			  )))
       (list A L U))
@@ -322,14 +321,14 @@
 	    (let ((retval (make-list  n :initial-element 0)))
 	      (setf (nth i retval) 1)
 	      retval))
-	  (make-list n :initial-element 0 )))
+	  (range-get 0 n)))
 
 (defun identity-matrix-nil (n)
   (mapcar (lambda (i)
 	    (let ((retval (make-list  n :initial-element nil)))
 	      (setf (nth i retval) 1)
 	      retval))
-	  (make-list n :initial-element 0 )))
+	  (range-get 0 n)))
 
 
 
@@ -338,6 +337,7 @@
   (mapcar (lambda (col)
 	    (mapcar (lambda (elem) (* constant elem)) col))
 	  matrix))
+
 
 
 
@@ -362,6 +362,9 @@
 		      numbers
 		      :initial-value '(() () ()))))))
 
+
+
+
 (defun list-matrix->csc-list (col-matrix)
   (let ((floats '())
 	(rows '())
@@ -385,8 +388,23 @@
 	  (number-grouper (reverse cols)))))
 
 
+
+
+
 (list-matrix->csc-list
- (car  (get-a-l-u-matrix 2 '((1 2) (3 4)) '((5 6) (7 8)) state '(1 0) control '((-10.0 -30.0) (5.0 -8.0)))))
+ (car  (get-a-l-u-matrix 2
+			 '((1 2) (3 4))
+			 '((5 6) (7 8))
+			 state
+			 '(1 0)
+			 control
+			 '((-10.0 -30.0) (5.0 -8.0))
+			 '(-1.0 ((1) (1)) 100000.0))))
+
+
+
+
+
 
 
 (list-matrix->csc-list  (car  (get-a-l-u-matrix 25
@@ -399,3 +417,282 @@
 						  (5.0 -8.0))
 						'(0.0 ((0) (1)) 0.5))))
 
+
+
+
+
+
+(number-grouper '(0 0 0 1 1 1 2 2 3 3 3 ))
+
+(length '(0 0 0 1 1 1 2 2 3 3 3 ))
+
+(list-matrix->csc-list '((1 nil 4) (3 4 8)))
+
+(cadr '((1 nil) (3 4)))
+
+(cadr '(1 2))
+
+
+
+(make-list 5 :initial-element 8)
+
+
+
+(defun insert-matrix-sparse (sparse-matrix smatrix pos)
+  (destructuring-bind (row col) pos
+    (loop for column in smatrix
+	  for i from 0
+	  do
+	     (loop for element in column
+		   do
+		      (if (not (eq element 'nil))
+			  (setf (nth (+ col i) sparse-matrix)
+				(append (nth (+ col i) sparse-matrix)
+					(list  element))))))
+    sparse-matrix))
+
+
+
+
+
+(defun get-sparse-a-l-u (time-horizon
+			 state-jacobian
+			 control-jacobian
+			 state-symbols
+			 current-state
+			 control-symbols
+			 &optional
+			   control-limits
+			   state-limits)
+  
+  "supposed to return non-sparse A matrix"
+
+  ;; Put verify code for size of state jacobian and control jacobian here
+  (let* ((state-len (length state-symbols))
+	 (control-len (length control-symbols))
+
+	 (m (+ (* (+ time-horizon 1) state-len)
+	       (* time-horizon control-len)
+	       (if (eq 'nil state-limits)
+		   0
+		   (* time-horizon 1))))
+	 
+	 (n (+ (* (+ time-horizon 1) state-len)
+	       (* time-horizon control-len))) ;; no of cols
+
+
+	 (empty (loop
+		  for unused_var from 1 to n
+		  collect
+		  ()))
+
+	 (state-jac-offset-row (length state-jacobian))
+
+	 (control-jac-offset-col (* (+ time-horizon 1) state-len))
+
+	 (control-identity-row-offset  (* (1+ time-horizon) state-len))
+
+	 (sparse-builder-list (append
+			       ;; first set the first identity, to set the initial condition
+			       ;; at t = 0
+			       (list (list (list '(0 0) (identity-matrix-nil state-len))))
+
+			       ;; they all set the model rules, for every single row
+			       (loop for i from 0 below time-horizon
+				     collect
+				     (append
+				      (let ((pos
+					      (list (+ state-jac-offset-row
+						       (* i state-len))
+						    (* i state-len))))
+					(list (list pos (mat-constant-mul -1  state-jacobian))))
+				      
+				      (let ((pos
+					      (list (+ state-jac-offset-row
+						       (* i state-len))
+						    (* (1+ i) state-len))))
+					(list (list pos (identity-matrix-nil state-len))))
+
+				      (let ((pos
+					      (list (+ state-jac-offset-row
+						       (* i state-len))
+						    (+ control-jac-offset-col
+						       (* i control-len)))))
+					(list (list pos (mat-constant-mul -1  control-jacobian))))
+				      ))
+			       ;; the identity for the limitations for Control
+			       (loop for i from 0 below time-horizon
+				     collect
+				     (let ((pos
+					     (list (+ control-identity-row-offset
+						      (* i control-len))
+						   (+ control-identity-row-offset
+						      (* i control-len)))))
+				       (list (list pos (identity-matrix-nil control-len)))))
+			       ))
+	 
+	 
+	 (state-limit-list (if (eq state-limits 'nil) ()
+			       (loop for i from 0 below time-horizon
+				     collect
+				     (let ((pos (list (+ n i)
+						      (* (+ i 1) state-len))))
+				       (list (list pos (nth 1 state-limits))))))))
+    
+    (let ((A (alexandria:flatten
+	      (reduce (lambda (initial-matrix row-operation)
+
+			(reduce (lambda (initial pos-smatrix)
+				  (destructuring-bind (pos smatrix) pos-smatrix
+				    (insert-matrix-sparse initial smatrix pos)
+				    ))
+				row-operation
+				:initial-value initial-matrix))
+		      (append 
+		       sparse-builder-list
+		       state-limit-list)
+		      :initial-value empty)))
+	  (L (concatenate 'list current-state
+			  (alexandria:flatten 
+			   (mapcar (lambda (unused)
+				     (make-list  state-len :initial-element 0))
+				   (range-get 0 time-horizon)))
+			  (alexandria:flatten 
+			   (mapcar (lambda (unused)
+				     (if (and  (listp control-limits)
+					       (= control-len
+						  (length (car control-limits)))
+					       (= control-len
+						  (length (cadr control-limits))))
+					 (car control-limits)
+					 (make-list  control-len :initial-element -1000.0)))
+				   (range-get 0 time-horizon)))
+			  (make-list  time-horizon :initial-element (nth 0 state-limits))
+			  ))
+	  (U (concatenate 'list current-state
+			  (alexandria:flatten 
+			   (mapcar (lambda (unused)
+				     (make-list  state-len :initial-element 0))
+				   (range-get 0 time-horizon)))
+			  (alexandria:flatten 
+			   (mapcar (lambda (unused)
+				     (if (and  (listp control-limits)
+					       (= control-len
+						  (length (car control-limits)))
+					       (= control-len
+						  (length (cadr control-limits))))
+					 (cadr control-limits)
+					 (make-list  control-len :initial-element +1000.0)))
+				   (range-get 0 time-horizon)))
+			  (make-list  time-horizon :initial-element (nth 2 state-limits))
+			  )))
+      (list A L U))
+    ))
+
+
+(get-sparse-a-l-u 2
+		  '((1 2) (3 4))
+		  '((5 6) (7 8))
+		  state
+		  '(1 0)
+		  control
+		  '((-10.0 -30.0)
+		    (5.0 -8.0))
+		  '(0.0 ((0) (1)) 0.5))
+
+
+(defvar *test-num* 25)
+
+(mapcar (lambda (x y) (- x y)) 
+
+	(car 
+	 (get-sparse-a-l-u *test-num*
+			   '((1 2) (3 4))
+			   '((5 6) (7 8))
+			   state
+			   '(1 0)
+			   control
+			   '((-10.0 -30.0)
+			     (5.0 -8.0))
+			   '(0.0 ((0) (1)) 0.5)))
+
+
+
+	(nth 3  (list-matrix->csc-list 
+		 (car  (get-a-l-u-matrix *test-num*
+					 '((1 2) (3 4))
+					 '((5 6) (7 8))
+					 state
+					 '(1 0)
+					 control
+					 '((-10.0 -30.0)
+					   (5.0 -8.0))
+					 '(0.0 ((0) (1)) 0.5)))))
+	)
+
+
+
+
+(- (length (car 
+	    (get-sparse-a-l-u *test-num*
+			      '((1 2) (3 4))
+			      '((5 6) (7 8))
+			      state
+			      '(1 0)
+			      control
+			      '((-10.0 -30.0)
+				(5.0 -8.0))
+			      '(0.0 ((0) (1)) 0.5))))
+   (length (nth 3  (list-matrix->csc-list 
+		    (car  (get-a-l-u-matrix *test-num*
+					    '((1 2) (3 4))
+					    '((5 6) (7 8))
+					    state
+					    '(1 0)
+					    control
+					    '((-10.0 -30.0)
+					      (5.0 -8.0))
+					    '(0.0 ((0) (1)) 0.5)))))))
+
+(progn 
+  (print 
+   (nth 3 
+	(list-matrix->csc-list 
+	 (car  (get-a-l-u-matrix 250
+				 '((1 2) (3 4))
+				 '((5 6) (7 8))
+				 state
+				 '(1 0)
+				 control
+				 '((-10.0 -30.0)
+				   (5.0 -8.0))
+				 '(0.0 ((0) (1)) 0.5))))))
+  (print 
+   (car 
+    (get-sparse-a-l-u 25
+		      '((1 2) (3 4))
+		      '((5 6) (7 8))
+		      state
+		      '(1 0)
+		      control
+		      '((-10.0 -30.0)
+			(5.0 -8.0))
+		      '(0.0 ((0) (1)) 0.5)
+		      )))
+  )
+
+
+
+
+
+
+(insert-matrix-sparse '(() () ()) '((1 2) (3 4)) '(1 1))
+(time  (car  (get-sparse-a-l-u 250
+			       '((1 2) (3 4))
+			       '((5 6) (7 8))
+			       state
+			       '(1 0)
+			       control
+			       '((-10.0 -30.0)
+				 (5.0 -8.0))
+			       '(0.0 ((0) (1)) 0.5))))
