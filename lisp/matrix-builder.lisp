@@ -18,26 +18,31 @@
 
 (require :alexandria)
 
-(defvar A '((1 3) (2 4)))
-
-(defvar B '((5 7) (6 8)))
-
-;; the state and column don't mean anything, they are just symbols
-(defvar state '(x v))
-(defvar control '(f a))
-
-
-
-;; firstly let's define horizon
-(defvar N 2)
-
 (defun range-get (l g) 
   (loop for i from l below g collect i))
 
-;; let's make the cost function
-;; let's not worry about V here,
+
 (defun get-trajectory(N)
   (mapcar (lambda (x) `(,x 0)) (range-get 1 (+ N 1))))
+
+(defun identity-matrix (n)
+  (mapcar (lambda (i)
+	    (let ((retval (make-list  n :initial-element 0)))
+	      (setf (nth i retval) 1)
+	      retval))
+	  (range-get 0 n)))
+
+(defun identity-matrix-nil (n)
+  (mapcar (lambda (i)
+	    (let ((retval (make-list  n :initial-element nil)))
+	      (setf (nth i retval) 1)
+	      retval))
+	  (range-get 0 n)))
+
+(defun mat-constant-mul (constant matrix)
+  (mapcar (lambda (col)
+	    (mapcar (lambda (elem) (* constant elem)) col))
+	  matrix))
 
 
 (defun get-q (time-horizon trajectory initial-state state-symbols control-symbols)
@@ -52,11 +57,6 @@
 					(make-list  (length control-symbols) :initial-element 0))
 				      (range-get 0 time-horizon))))))))
 
-(get-q 2
-       (get-trajectory 2)
-       '(0 0)
-       state
-       control)
 
 
 (defun get-p (horizon-length state-weights control-weights &optional prop-lambda-state prop-lambda-conrtol)
@@ -125,29 +125,6 @@
 
 
 
-
-
-
-;; (defun insert-matrix (big-matrix small-matrix pos)
-;;   "Insert small-matrix into big-matrix at position (row, col).
-;;    Both matrices are in column-major format: ((col0) (col1) ...)
-;;    where each inner list is a COLUMN (top to bottom)."
-;;   (destructuring-bind (start-row start-col) pos
-;;     (loop with n-rows = (length (first big-matrix)) ; number of rows
-;;           with n-cols = (length big-matrix)	    ; number of cols
-;;           for small-col from 0 below (length small-matrix)
-;;           for big-col = (+ start-col small-col)
-;;           when (< big-col n-cols)
-;;             do (let ((small-column (nth small-col small-matrix))
-;;                      (big-column (nth big-col big-matrix)))
-;; 		 (loop for small-row from 0 below (length small-column)
-;;                        for big-row = (+ start-row small-row)
-;;                        when (< big-row n-rows)
-;; 			 do (setf (nth big-row big-column)
-;; 				  (nth small-row small-column)))))
-;;     big-matrix))
-
-
 (defun insert-matrix (big-matrix small-matrix pos)
   (declare (optimize (speed 3) (safety 1) (debug 0))
            (type list big-matrix small-matrix pos))
@@ -177,25 +154,7 @@
                          for small-row fixnum from 0
                          do (setf (nth big-row big-column)
                                   (nth small-row small-column)))))))
-      big-matrix))
-
-(get-p 2
-       '((1 0)
-	 (0 3))
-       '((2 0)
-	 (0 4))
-       (lambda (i y)
-	 (* (exp (* 0.1  (- i)))  y)))
-
-
-
-
-
-
-
-(get-trajectory 2)
-
-
+    big-matrix))
 
 
 
@@ -313,34 +272,6 @@
 
 
 
-
-
-
-(defun identity-matrix (n)
-  (mapcar (lambda (i)
-	    (let ((retval (make-list  n :initial-element 0)))
-	      (setf (nth i retval) 1)
-	      retval))
-	  (range-get 0 n)))
-
-(defun identity-matrix-nil (n)
-  (mapcar (lambda (i)
-	    (let ((retval (make-list  n :initial-element nil)))
-	      (setf (nth i retval) 1)
-	      retval))
-	  (range-get 0 n)))
-
-
-
-
-(defun mat-constant-mul (constant matrix)
-  (mapcar (lambda (col)
-	    (mapcar (lambda (elem) (* constant elem)) col))
-	  matrix))
-
-
-
-
 (defun number-grouper (numbers)
   (reverse
    (cons (length numbers)
@@ -386,56 +317,6 @@
 	  (reverse floats)
 	  (reverse rows)
 	  (number-grouper (reverse cols)))))
-
-
-
-
-
-(list-matrix->csc-list
- (car  (get-a-l-u-matrix 2
-			 '((1 2) (3 4))
-			 '((5 6) (7 8))
-			 state
-			 '(1 0)
-			 control
-			 '((-10.0 -30.0) (5.0 -8.0))
-			 '(-1.0 ((1) (1)) 100000.0))))
-
-
-
-
-
-
-
-(list-matrix->csc-list  (car  (get-a-l-u-matrix 25
-						'((1 2) (3 4))
-						'((5 6) (7 8))
-						state
-						'(1 0)
-						control
-						'((-10.0 -30.0)
-						  (5.0 -8.0))
-						'(0.0 ((0) (1)) 0.5))))
-
-
-
-
-
-
-(number-grouper '(0 0 0 1 1 1 2 2 3 3 3 ))
-
-(length '(0 0 0 1 1 1 2 2 3 3 3 ))
-
-(list-matrix->csc-list '((1 nil 4) (3 4 8)))
-
-(cadr '((1 nil) (3 4)))
-
-(cadr '(1 2))
-
-
-
-(make-list 5 :initial-element 8)
-
 
 
 (defun insert-matrix-sparse (sparse-matrix smatrix pos)
@@ -588,111 +469,3 @@
 			  )))
       (list A L U))
     ))
-
-
-(get-sparse-a-l-u 2
-		  '((1 2) (3 4))
-		  '((5 6) (7 8))
-		  state
-		  '(1 0)
-		  control
-		  '((-10.0 -30.0)
-		    (5.0 -8.0))
-		  '(0.0 ((0) (1)) 0.5))
-
-
-(defvar *test-num* 25)
-
-(mapcar (lambda (x y) (- x y)) 
-
-	(car 
-	 (get-sparse-a-l-u *test-num*
-			   '((1 2) (3 4))
-			   '((5 6) (7 8))
-			   state
-			   '(1 0)
-			   control
-			   '((-10.0 -30.0)
-			     (5.0 -8.0))
-			   '(0.0 ((0) (1)) 0.5)))
-
-
-
-	(nth 3  (list-matrix->csc-list 
-		 (car  (get-a-l-u-matrix *test-num*
-					 '((1 2) (3 4))
-					 '((5 6) (7 8))
-					 state
-					 '(1 0)
-					 control
-					 '((-10.0 -30.0)
-					   (5.0 -8.0))
-					 '(0.0 ((0) (1)) 0.5)))))
-	)
-
-
-
-
-(- (length (car 
-	    (get-sparse-a-l-u *test-num*
-			      '((1 2) (3 4))
-			      '((5 6) (7 8))
-			      state
-			      '(1 0)
-			      control
-			      '((-10.0 -30.0)
-				(5.0 -8.0))
-			      '(0.0 ((0) (1)) 0.5))))
-   (length (nth 3  (list-matrix->csc-list 
-		    (car  (get-a-l-u-matrix *test-num*
-					    '((1 2) (3 4))
-					    '((5 6) (7 8))
-					    state
-					    '(1 0)
-					    control
-					    '((-10.0 -30.0)
-					      (5.0 -8.0))
-					    '(0.0 ((0) (1)) 0.5)))))))
-
-(progn 
-  (print 
-   (nth 3 
-	(list-matrix->csc-list 
-	 (car  (get-a-l-u-matrix 250
-				 '((1 2) (3 4))
-				 '((5 6) (7 8))
-				 state
-				 '(1 0)
-				 control
-				 '((-10.0 -30.0)
-				   (5.0 -8.0))
-				 '(0.0 ((0) (1)) 0.5))))))
-  (print 
-   (car 
-    (get-sparse-a-l-u 25
-		      '((1 2) (3 4))
-		      '((5 6) (7 8))
-		      state
-		      '(1 0)
-		      control
-		      '((-10.0 -30.0)
-			(5.0 -8.0))
-		      '(0.0 ((0) (1)) 0.5)
-		      )))
-  )
-
-
-
-
-
-
-(insert-matrix-sparse '(() () ()) '((1 2) (3 4)) '(1 1))
-(time  (car  (get-sparse-a-l-u 250
-			       '((1 2) (3 4))
-			       '((5 6) (7 8))
-			       state
-			       '(1 0)
-			       control
-			       '((-10.0 -30.0)
-				 (5.0 -8.0))
-			       '(0.0 ((0) (1)) 0.5))))
