@@ -23,87 +23,196 @@
                       :spec-path "/home/light/stuff/MPC/specs/" 
                       :sysincludes (uiop:split-string (uiop:getenv "C_INCLUDE_PATH") :separator ":"))
 
+;; Design Goal, make something cool
+;; when designing the MPC, we would want the optimizer to be global....
+;; sorry if you want another controller, make another repl
+;; the main function will be the repl, from where users will strt MPC
+;; firstly, create-mpc-instance
 
 
 
+;; define a bunch of global
+(progn
+(defvar *p-x* 'nil)
+  (defvar *p-i* 'nil)
+  (defvar *p-p* 'nil)
+  (defvar *p-nnz* 'nil)
+  
+  (defvar *q-vec* 'nil)
+
+  (defvar *n* 'nil)
+  (defvar *m* 'nil)
+
+  (defvar *a-x* 'nil)
+  (defvar *a-i* 'nil)
+  (defvar *a-p* 'nil)
+  (defvar *a-nnz* 'nil)
+
+  (defvar *l-vec* 'nil)
+  (defvar *u-vec* 'nil)
+
+  (defvar *p* 'nil)
+  (defvar *q* 'nil)
+  (defvar *a* 'nil)
+  (defvar *l* 'nil)
+  (defvar *u* 'nil)
 
 
-
-(cffi:with-foreign-objects ((Array :double 5))
-  (loop for i from 0 below 5
-	do
-	   (setf (cffi:mem-aref Array :double i) (* i 5.0d0)))
-
-  (loop for i from 0 below 5
-	do
-	   (print (cffi:mem-aref Array :double i)))
+  (defvar *mpc-solver-settings* 'nil)
+  (defvar *mpc-solver* 'nil)
   )
 
 
-(defun cl-list->double-c-array (list)
-  (let* ((len (length list))
-	 (Array (cffi:foreign-alloc :double :count len)))
-    
-    (loop for value in list
-	  for i from 0
-	  do
-	     (setf (cffi:mem-aref Array :double i) value))
-    Array))
+(defun list->float-list (list-of-numbers)
+  (mapcar (lambda (x) (coerce x 'double-float)) list-of-numbers))
 
 
-(defun cl-list->int-c-array (list)
-  (let* ((len (length list))
-	 (Array (cffi:foreign-alloc :int :count len)))
-    
-    (loop for value in list
-	  for i from 0
-	  do
-	     (setf (cffi:mem-aref Array :long-long i) value))
-    Array))
+(defun all-c-vars-free ()
+  (if (not (eq *p-x* 'nil)) (progn (cffi:foreign-free *p-x*)
+				   (setf *p-x* 'nil)))
+  (if (not (eq *p-i* 'nil)) (progn (cffi:foreign-free *p-i*)
+				   (setf *p-i* 'nil)))
+  (if (not (eq *p-p* 'nil)) (progn (cffi:foreign-free *p-p*)
+				   (setf *p-p* 'nil)))
+  (if (not (eq *p-nnz* 'nil)) (setf *p-nnz* 'nil))
+  
+  (if (not (eq *q-vec* 'nil)) (progn (cffi:foreign-free *q-vec*)
+				     (setf *q-vec* 'nil)))
 
+  (if (not (eq *n* 'nil)) (setf *n* 'nil))
+  (if (not (eq *m* 'nil)) (setf *m* 'nil))
 
-(let* ((P_x '(4.0d0 1.0d0 2.0d0))
-       (P_x-c (cl-list->double-c-array P_x))
-       
-       (P_i '(0 0 1))
-       (P_i-c (cl-list->int-c-array P_i))
-       
-       (P_p '(0 1 3))
-       (P_p-c (cl-list->int-c-array P_p))
-       
-       (q '(1.0d0 1.0d0))
-       (q-c (cl-list->double-c-array q))
-       
-       (A_x '(1.0d0 1.0d0 1.0d0 1.0d0))
-       (A_x-c (cl-list->double-c-array A_x))
-       
-       (A_i '(0 1 0 2))
-       (A_i-c (cl-list->int-c-array A_i))
-       
-       (A_p '(0 2 4))
-       (A_p-c (cl-list->int-c-array A_p))
-       
-       (l '(1.0d0 0.0d0 0.0d0))
-       (l-c (cl-list->double-c-array l))
-       
-       (u '(1.0d0 0.7d0 0.7d0))
-       (u-c (cl-list->double-c-array u))
+  (if (not (eq *a-x* 'nil)) (progn (cffi:foreign-free *a-x*)
+				   (setf *a-x* 'nil)))
+  (if (not (eq *a-i* 'nil)) (progn (cffi:foreign-free *a-i*)
+				   (setf *a-i* 'nil)))
+  (if (not (eq *a-p* 'nil)) (progn (cffi:foreign-free *a-p*)
+				   (setf *a-p* 'nil)))
+  (if (not (eq *a-nnz* 'nil)) (setf *a-nnz* 'nil))
 
-       (P_nnz 3)
-       (A_nnz 4)
-       (n 2)
-       (m 3)
-       (exitflag 0)
-       (p (osqp-csc-matrix-new n n p_nnz p_x-c p_i-c p_p-c))
-       (a (osqp-csc-matrix-new m n a_nnz a_x-c a_i-c a_p-c))
-       (settings (osqp-settings-new))
-       (solver (cffi:foreign-alloc :pointer))
-       )
+  (if (not (eq *l-vec* 'nil)) (progn (cffi:foreign-free *l-vec*)
+				     (setf *l-vec* 'nil)))
+  (if (not (eq *u-vec* 'nil)) (progn (cffi:foreign-free *u-vec*)
+				     (setf *u-vec* 'nil)))
 
-  (osqp-set-default-settings settings)
-  ;; (setf (osqp-settings.alpha settings) 1.0d0)
-  (setq this-stupid-test  (osqp-setup solver p q-c a l-c u-c m n settings))
+  (if (not (eq *p* 'nil)) (progn (osqp-csc-matrix-free *p*)
+				 (setf *p* 'nil)))
+  (if (not (eq *q* 'nil)) (progn (cffi:foreign-free *q*)
+				 (setf *q* 'nil)))
+  (if (not (eq *a* 'nil)) (progn (osqp-csc-matrix-free *a*)
+				 (setf *a* 'nil)))
+  (if (not (eq *l* 'nil)) (progn (cffi:foreign-free *l*)
+				 (setf *l* 'nil)))
+  (if (not (eq *u* 'nil)) (progn (cffi:foreign-free *u*)
+				 (setf *u*  'nil)))
 
+  (if (not (eq *mpc-solver-settings* 'nil)) (progn (osqp-settings-free *mpc-solver-settings*)
+						   (setf *mpc-solver-settings* 'nil)))
+
+  (if (not (eq *mpc-solver* 'nil)) (progn (osqp-cleanup *mpc-solver*)
+					  (setf *mpc-solver* 'nil)))
   )
 
+(defun set-mpc-problem (dim p q a l u)
+  (all-c-vars-free)
+  
+  (destructuring-bind (row col) dim
+    (setf *m* row)
+    (setf *n* col)
+    
+    ;; quardratic cost
+    (destructuring-bind (p-x p-i p-p) p
+      (setf *p-x* (cffi:foreign-alloc :double :initial-contents (list->float-list p-x)))
+      (setf *p-i* (cffi:foreign-alloc :int64 :initial-contents  p-i))
+      (setf *p-p* (cffi:foreign-alloc :int64 :initial-contents  p-p))
+      (setf *p-nnz* (length p-x))
+      (setf *p* (osqp-csc-matrix-new *n* *n* *p-nnz* *p-x* *p-i* *p-p*)))
+
+
+    ;; linear cost
+    (setf *q* (cffi:foreign-alloc :double :initial-contents (list->float-list q)))
+
+    ;; model
+    (destructuring-bind (a-x a-i a-p) a
+      (setf *a-x* (cffi:foreign-alloc :double :initial-contents (list->float-list a-x)))
+      (setf *a-i* (cffi:foreign-alloc :int64 :initial-contents  a-i))
+      (setf *a-p* (cffi:foreign-alloc :int64 :initial-contents  a-p))
+      (setf *a-nnz* (length a-x))
+      (setf *a* (osqp-csc-matrix-new *m* *n* *a-nnz* *a-x* *a-i* *a-p*)))
+
+    ;; bounds
+    (setf *l* (cffi:foreign-alloc :double :initial-contents (list->float-list l)))
+    (setf *u* (cffi:foreign-alloc :double :initial-contents (list->float-list u)))
+
+    ;; Now actually make the solver and settings
+    ;; solver
+    (setf *mpc-solver-settings* (osqp-settings-new))
+    (osqp-set-default-settings *mpc-solver-settings*)
+
+
+    (autowrap:with-alloc (solver-ptr-ptr :pointer)
+      (let ((exitflag (osqp-setup solver-ptr-ptr
+				  *p*
+				  *q*
+				  *a*
+				  *l*
+				  *u*
+				  *m*
+				  *n*
+				  *mpc-solver-settings*)))
+
+	(if (= 0 exitflag)
+	    (let* ((raw-solver-ptr (cffi:mem-ref solver-ptr-ptr :pointer))
+		   (solver (make-osqp-solver :ptr raw-solver-ptr)))
+	      (setf *mpc-solver* solver)
+	      ))))))
+
+
+(defun mpc-matrix-update-alu (a-mat l u)
+  (let ((a-mat-floats (list->float-list a-mat))
+	(l-floats (list->float-list l))
+	(u-floats (list->float-list u)))
+    (cffi:with-foreign-array (a-mat-c a-mat-floats :double)
+      (cffi:with-foreign-array (l-vec-c l-floats :double)
+	(cffi:with-foreign-array (u-vec-c u-floats :double)
+	  (let ((c-null (cffi:null-pointer)))
+	    (osqp-update-data-mat *mpc-solver*
+				  c-null c-null 0
+				  a-mat-c c-null (length a-mat))
+	    (osqp-update-data-vec *mpc-solver* c-null l-vec-c u-vec-c)))))))
+
+
+(defun mpc-matrix-update-pq (p-mat q)
+  (let ((p-mat-floats (list->float-list p-mat))
+	(q-floats (list->float-list q)))
+    (cffi:with-foreign-array (p-mat-c p-mat-floats :double)
+      (cffi:with-foreign-array (q-vec-c q-floats :double)
+	(let ((c-null (cffi:null-pointer)))
+	    (osqp-update-data-mat *mpc-solver*
+				  p-mat-c c-null (length p-mat)
+				  c-null c-null 0)
+	    (osqp-update-data-vec *mpc-solver* q-vec-c c-null c-null))))))
+
+(defun solve-mpc ()
+  (if (not *mpc-solver*)
+      (error "Run (set-mpc-problem ...) first.")
+      (progn
+        (osqp-solve *mpc-solver*)
+        (let* ((sol-raw (osqp-solver.solution *mpc-solver*))
+               (sol-wrap (make-osqp-solution :ptr sol-raw))
+               (x-ptr (osqp-solution.x sol-wrap)))
+          (loop for i from 0 below *n*
+                collect (cffi:mem-aref x-ptr :double i))))))
+
+
+(set-mpc-problem '(3 2) 
+                 '((4.0 1.0 2.0) (0 0 1) (0 1 3))
+                 '(1.0 1.0)
+                 '((1.0 1.0 1.0 1.0) (0 1 0 2) (0 2 4))
+                 '(1.0 0.0 0.0)
+                 '(1.0 0.7 0.7))
+
+
+(time 
+ (solve-mpc))
 
