@@ -21,7 +21,6 @@
 (defun range-get (l g) 
   (loop for i from l below g collect i))
 
-
 (defun get-trajectory(N)
   (mapcar (lambda (x) `(,x 0)) (range-get 1 (+ N 1))))
 
@@ -271,27 +270,20 @@
     ))
 
 
-
-(defun number-grouper (numbers)
-  (reverse
-   (cons (length numbers)
-	 (nth 2 
-	      (reduce (lambda (acc number)
-			(destructuring-bind (target-elem count number-list) acc
-			  (cond
-			    ((eq target-elem 'nil)
-			     (list number
-				   1 
-				   (cons 0 number-list)))
-			    ((eq number target-elem)
-			     (list target-elem (1+ count) number-list))
-			    (t
-			     (list number
-				   (1+ count)
-				   (cons count number-list)))
-			    )))
-		      numbers
-		      :initial-value '(() () ()))))))
+(defun number-grouper (numbers cols)
+  (let ((array-counter (make-array cols :initial-element 0))
+	(array-answer (make-array (1+ cols) :initial-element 0))
+	(acc 0))
+    (loop for num in numbers
+	  do
+	     (setf (aref array-counter num)
+		   (1+ (aref array-counter num))))
+    (loop for num across array-counter
+	  for i from 1
+	  do
+	  (setf acc (+ acc num))
+	  (setf (aref array-answer i) acc))
+    (coerce array-answer 'list)))
 
 
 
@@ -311,13 +303,26 @@
 			    (setf floats (cons element floats))
 			    (setf rows (cons row-no rows))
 			    (setf cols (cons col-no cols))))))
-    (list (length (car col-matrix)) ;; no of rows
-	  (length col-matrix)	    ;; no of columns
-	  (length floats)	    ;; max number of non zeros
+    (list (length (nth (1- (length col-matrix))  col-matrix)) ;; no of rows
+	  (length col-matrix) ;; no of columns
+	  (length floats)     ;; max number of non zeros
 	  (reverse floats)
 	  (reverse rows)
-	  (number-grouper (reverse cols)))))
+	  (number-grouper (reverse cols) (length col-matrix)))))
 
+
+(let ((thing '(1 2 3 4 5 7 9)))
+  (nth (- (length thing) 1) thing))
+
+(defun list-matrix->list-upper-triangular-matrix (list-matrix)
+  (loop for column in list-matrix
+	for i from 1
+	collect
+	(subseq column 0 i)))
+
+
+(defun list-matrix->upper-tirangular-csc-list (col-matrix)
+  (list-matrix->csc-list (list-matrix->list-upper-triangular-matrix col-matrix)))
 
 (defun insert-matrix-sparse (sparse-matrix smatrix pos)
   (destructuring-bind (row col) pos
@@ -336,9 +341,14 @@
 
 
 
+(defun try-nth (n op-list)
+  (if (>= n (length op-list))
+      (car op-list)
+      (nth n op-list)))
+
 (defun get-sparse-a-l-u (time-horizon
-			 state-jacobian
-			 control-jacobian
+			 state-jacobians
+			 control-jacobians
 			 state-symbols
 			 current-state
 			 control-symbols
@@ -346,8 +356,6 @@
 			   control-limits
 			   state-limits)
   
-  "supposed to return non-sparse A matrix"
-
   ;; Put verify code for size of state jacobian and control jacobian here
   (let* ((state-len (length state-symbols))
 	 (control-len (length control-symbols))
@@ -367,7 +375,7 @@
 		  collect
 		  ()))
 
-	 (state-jac-offset-row (length state-jacobian))
+	 (state-jac-offset-row (length (car state-jacobians)))
 
 	 (control-jac-offset-col (* (+ time-horizon 1) state-len))
 
@@ -386,7 +394,7 @@
 					      (list (+ state-jac-offset-row
 						       (* i state-len))
 						    (* i state-len))))
-					(list (list pos (mat-constant-mul -1  state-jacobian))))
+					(list (list pos (mat-constant-mul -1 (try-nth i state-jacobians)))))
 				      
 				      (let ((pos
 					      (list (+ state-jac-offset-row
@@ -399,7 +407,7 @@
 						       (* i state-len))
 						    (+ control-jac-offset-col
 						       (* i control-len)))))
-					(list (list pos (mat-constant-mul -1  control-jacobian))))
+					(list (list pos (mat-constant-mul -1 (try-nth i control-jacobians)))))
 				      ))
 			       ;; the identity for the limitations for Control
 			       (loop for i from 0 below time-horizon
@@ -469,3 +477,4 @@
 			  )))
       (list A L U))
     ))
+
