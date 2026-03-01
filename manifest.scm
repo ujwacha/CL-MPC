@@ -11,6 +11,8 @@
 		     lisp
 		     lisp-xyz
 		     cpp
+		     python
+		     python-web
 		     compression
 		     gdb)
 
@@ -28,7 +30,13 @@
    cl-cffi
    cl-autowrap
    cl-asdf
-   
+   cl-usocket
+   cl-bordeaux-threads
+   cl-nibbles
+
+   ;; python
+   python-websockets
+   python
    ;; Build tools
    coreutils
    glibc
