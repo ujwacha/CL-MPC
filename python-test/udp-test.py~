@@ -1,0 +1,241 @@
+import socket
+import struct
+import time
+import threading
+import random
+import signal
+import sys
+
+class UDPFloatServer:
+    def __init__(self, port=9999, send_rate_hz=100):
+        """
+        Initialize UDP server on single port for sending and receiving floats
+        
+        Args:
+            port: Port for both sending and receiving (default: 9999)
+            send_rate_hz: Frequency of sending data in Hz (default: 100)
+        """
+        self.port = port
+        self.send_interval = 1.0 / send_rate_hz
+        
+        # Create a single socket for both sending and receiving
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.socket.bind(('', self.port))
+        self.socket.settimeout(0.01)  # 10ms timeout for receiving
+        
+        self.running = False
+        self.last_received_float = 0.0
+        self.receive_lock = threading.Lock()
+        
+        # Track statistics
+        self.sent_count = 0
+        self.received_count = 0
+        self.error_count = 0
+        
+        # Store the last sender address for potential response
+        self.last_sender_addr = None
+        
+        print(f"UDP Float Server initialized on port {self.port}")
+        print(f"Sending rate: {send_rate_hz} Hz")
+        print("Ready to communicate with netcat (nc -l -u -v -p 9999)")
+        
+    def start(self):
+        """Start the server threads"""
+        self.running = True
+        
+        # Start sending thread
+        self.send_thread = threading.Thread(target=self._send_loop)
+        self.send_thread.daemon = True
+        self.send_thread.start()
+        
+        # Start receiving thread
+        self.receive_thread = threading.Thread(target=self._receive_loop)
+        self.receive_thread.daemon = True
+        self.receive_thread.start()
+        
+        print(f"\nServer started on port {self.port}")
+        print("Press Ctrl+C to stop...\n")
+        
+    def stop(self):
+        """Stop the server"""
+        self.running = False
+        if hasattr(self, 'send_thread'):
+            self.send_thread.join(timeout=1.0)
+        if hasattr(self, 'receive_thread'):
+            self.receive_thread.join(timeout=1.0)
+        self.socket.close()
+        
+        print(f"\nServer stopped")
+        print(f"Statistics:")
+        print(f"  Packets sent: {self.sent_count}")
+        print(f"  Packets received: {self.received_count}")
+        print(f"  Errors: {self.error_count}")
+        
+    def _send_loop(self):
+        """Main sending loop - sends 4 floats at specified frequency"""
+        while self.running:
+            loop_start = time.time()
+            
+            try:
+                # Generate 4 meaningful floats
+                timestamp = time.time()
+                
+                # Float 1: Timestamp seconds (mod 100 for readability)
+                f1 = timestamp % 100
+                
+                # Float 2: Sine wave based on time (0 to 1)
+                f2 = (timestamp * 0.1) % 10
+                
+                # Float 3: Random noise (-1 to 1)
+                f3 = random.uniform(-1.0, 1.0)
+                
+                # Float 4: Echo of last received float (or 0 if none)
+                with self.receive_lock:
+                    f4 = self.last_received_float
+                
+                # Pack 4 floats into binary format (16 bytes total: 4 * 4 bytes)
+                packed_data = struct.pack('ffff', f1, f2, f3, f4)
+                
+                # Convert to hex for display/debugging
+                hex_data = ' '.join(f'{b:02x}' for b in packed_data)
+                
+                # Send to broadcast or specific address
+                # Using broadcast address to work with netcat
+                self.socket.sendto(packed_data, ('<broadcast>', self.port))
+                
+                self.sent_count += 1
+                
+                # Print parsed floats and hex (every 10th packet to avoid flooding)
+                if self.sent_count % 10 == 1:
+                    print(f"\n[OUT] Packet #{self.sent_count}")
+                    print(f"      Floats: [{f1:.3f}, {f2:.3f}, {f3:.3f}, {f4:.3f}]")
+                    print(f"      Hex: {hex_data}")
+                    print(f"      Bytes: {len(packed_data)} bytes")
+                
+            except Exception as e:
+                self.error_count += 1
+                print(f"Error sending data: {e}")
+            
+            # Maintain exact timing
+            elapsed = time.time() - loop_start
+            sleep_time = max(0, self.send_interval - elapsed)
+            time.sleep(sleep_time)
+            
+    def _receive_loop(self):
+        """Main receiving loop - receives and parses 1 float"""
+        while self.running:
+            try:
+                # Receive data (expecting 4 bytes for 1 float)
+                data, addr = self.socket.recvfrom(1024)  # Buffer size 1024
+                
+                # Store sender address for potential response
+                self.last_sender_addr = addr
+                
+                data_len = len(data)
+                
+                # Parse based on data length
+                if data_len == 4:
+                    # Single float (4 bytes)
+                    received_float = struct.unpack('f', data)[0]
+                    
+                    # Update last received value thread-safely
+                    with self.receive_lock:
+                        self.last_received_float = received_float
+                    
+                    self.received_count += 1
+                    
+                    # Parse and display the float
+                    print(f"\n[IN] Packet #{self.received_count} from {addr}")
+                    print(f"     Single float: {received_float:.6f}")
+                    print(f"     Hex: {' '.join(f'{b:02x}' for b in data)}")
+                    
+                elif data_len == 8:
+                    # Two floats (8 bytes)
+                    floats = struct.unpack('ff', data)
+                    print(f"\n[IN] Packet #{self.received_count+1} from {addr}")
+                    print(f"     Two floats: [{floats[0]:.6f}, {floats[1]:.6f}]")
+                    print(f"     Hex: {' '.join(f'{b:02x}' for b in data)}")
+                    self.received_count += 1
+                    
+                elif data_len == 12:
+                    # Three floats (12 bytes)
+                    floats = struct.unpack('fff', data)
+                    print(f"\n[IN] Packet #{self.received_count+1} from {addr}")
+                    print(f"     Three floats: [{floats[0]:.6f}, {floats[1]:.6f}, {floats[2]:.6f}]")
+                    print(f"     Hex: {' '.join(f'{b:02x}' for b in data)}")
+                    self.received_count += 1
+                    
+                elif data_len == 16:
+                    # Four floats (16 bytes)
+                    floats = struct.unpack('ffff', data)
+                    print(f"\n[IN] Packet #{self.received_count+1} from {addr}")
+                    print(f"     Four floats: [{floats[0]:.6f}, {floats[1]:.6f}, {floats[2]:.6f}, {floats[3]:.6f}]")
+                    print(f"     Hex: {' '.join(f'{b:02x}' for b in data)}")
+                    self.received_count += 1
+                    
+                else:
+                    # Try to interpret as text if not binary floats
+                    try:
+                        text_data = data.decode('utf-8').strip()
+                        print(f"\n[IN] Text from {addr}: '{text_data}'")
+                        print(f"     Raw bytes: {' '.join(f'{b:02x}' for b in data)}")
+                    except:
+                        print(f"\n[IN] Unknown data format ({data_len} bytes) from {addr}")
+                        print(f"     Hex: {' '.join(f'{b:02x}' for b in data)}")
+                
+            except socket.timeout:
+                # No data received, continue loop
+                continue
+            except Exception as e:
+                if self.running:
+                    self.error_count += 1
+                    print(f"Error receiving data: {e}")
+    
+    def get_last_received(self):
+        """Get the last received float value"""
+        with self.receive_lock:
+            return self.last_received_float
+
+def signal_handler(sig, frame, server):
+    """Handle Ctrl+C gracefully"""
+    print("\n\nShutting down...")
+    server.stop()
+    sys.exit(0)
+
+def main():
+    # Create the server on port 9999
+    server = UDPFloatServer(
+        port=9999,
+        send_rate_hz=100  # 100 Hz
+    )
+    
+    # Set up signal handler for graceful shutdown
+    signal.signal(signal.SIGINT, lambda sig, frame: signal_handler(sig, frame, server))
+    
+    try:
+        # Start the server
+        server.start()
+        
+        # Keep main thread alive and show periodic status
+        last_status_time = time.time()
+        while True:
+            time.sleep(1)
+            
+            # Show status every 5 seconds
+            current_time = time.time()
+            if current_time - last_status_time >= 5:
+                last_val = server.get_last_received()
+                print(f"\n[STATUS] Last received: {last_val:.6f} | "
+                      f"Sent: {server.sent_count} | "
+                      f"Received: {server.received_count} | "
+                      f"Errors: {server.error_count}")
+                last_status_time = current_time
+                
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.stop()
+
+if __name__ == "__main__":
+    main()

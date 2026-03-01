@@ -1,0 +1,89 @@
+
+
+
+;; (jacobian
+;;  '(x y)
+;;  '((x)
+;;    (y)))
+
+;; (simplify '(+ 1 (* (cos x) (sin x) 0) 2 (sin x)))
+
+;; (simplify '(* 1 0) )
+
+;; (map 'list (lambda (x) (* x x)) '(1 2 3))
+
+;; (diff '(x) 'x)
+
+;; (eq (length '(x)) 1)
+
+;; (diff (car '(x)) 'x)
+
+;; (jacobian
+;;  '(x y)
+;;  '((+ x y)
+;;    (+ x y)))
+
+;; (diff '(1) 'x)
+
+
+
+
+;; (setq g -9.8)
+;; (setq invr2 (/ 1 (* 0.1 0.1)))
+;; (setq states '(theta
+;; 		 omega
+;; 		 x
+;; 		 v))
+
+;; (setq delt 0.01)
+
+;; (setq state-transition `((+ theta (* omega ,delt))
+;; 			 (+ omega (* ,invr2 (+ (* ,g (sin theta)) (* a (cos theta)))))
+;; 			 (+ x (* v ,delt))
+;; 			 (+ v (* a ,delt))))
+;; (setq controls '(a))
+
+;; (setq a-mat (jacobian
+;; 	 '(theta
+;; 	   omega
+;; 	   x
+;; 	   v)
+;; 	 `((+ theta (* omega ,delt))
+;; 	   (+ omega (* ,delt  (* ,invr2 (+ (* ,g (sin theta)) (* a (cos theta))))))
+;; 	   (+ x (* v ,delt))
+;; 	   (+ v (* a ,delt)))))
+
+
+;; (setq b-mat (jacobian
+;; 	 '(a)
+;; 	 `((+ theta (* omega ,delt))
+;; 	   (+ omega (* ,delt ,invr2 (+ (* ,g (sin theta)) (* a (cos theta)))))
+;; 	   (+ x (* v ,delt))
+;; 	   (+ v (* a ,delt)))))
+
+
+
+
+
+
+
+
+;; (compile 'my-jacobian (get-lambda '(x v theta omega a) a-mat))
+
+
+;; (my-jacobian 0 0 0 0 0)
+
+;; (get-lambda '(x v theta omega a) a-mat)
+
+;; (defvar my-test-state '(a b c d))
+;; (jacobian my-test-state '((+ a b c)))
+;; Jacobian is calculated in row way, not in column way
+
+
+;; (state-limit-symbolic->list my-test-state
+;; 			    -0.1
+;; 			    '((+ (* 2 a) (* 3 b) (* (sin t) c ) d))
+;; 			    2.4
+;;
+;;
+;; )
