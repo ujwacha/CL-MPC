@@ -115,10 +115,12 @@
 
 (defun set-mpc-problem (dim p q a l u)
   (all-c-vars-free)
-  
+  (print "all vars cleared")
   (destructuring-bind (row col) dim
     (setf *m* row)
     (setf *n* col)
+    (print *m*)
+    (print *n*)
     
     ;; quardratic cost
     (destructuring-bind (p-x p-i p-p) p
@@ -161,37 +163,70 @@
 				  *n*
 				  *mpc-solver-settings*)))
 
+	(print exitflag)
 	(if (= 0 exitflag)
 	    (let* ((raw-solver-ptr (cffi:mem-ref solver-ptr-ptr :pointer))
 		   (solver (make-osqp-solver :ptr raw-solver-ptr)))
 	      (setf *mpc-solver* solver)
+	      (print "completed the solver")
 	      ))))))
 
 
+
+(defun float-list->vector-list (input-list)
+  (map '(vector double-float) 
+       (lambda (x) (coerce x 'double-float)) 
+       input-list))
+
+
 (defun mpc-matrix-update-alu (a-mat l u)
-  (let ((a-mat-floats (list->float-list a-mat))
-	(l-floats (list->float-list l))
-	(u-floats (list->float-list u)))
-    (cffi:with-foreign-array (a-mat-c a-mat-floats :double)
-      (cffi:with-foreign-array (l-vec-c l-floats :double)
-	(cffi:with-foreign-array (u-vec-c u-floats :double)
+  (let ((a-mat-floats (float-list->vector-list
+		       (list->float-list a-mat)))
+	(l-floats (float-list->vector-list
+		   (list->float-list l)))
+	(u-floats (float-list->vector-list
+		   (list->float-list u))))
+    (cffi:with-foreign-array (a-mat-c a-mat-floats `(:array
+						     :double
+						     ,(length a-mat-floats)))
+
+      (cffi:with-foreign-array (l-vec-c l-floats `(:array
+						   :double
+						   ,(length l-floats)))
+
+	(cffi:with-foreign-array (u-vec-c u-floats `(:array
+						     :double
+						     ,(length u-floats)))
 	  (let ((c-null (cffi:null-pointer)))
 	    (osqp-update-data-mat *mpc-solver*
 				  c-null c-null 0
 				  a-mat-c c-null (length a-mat))
-	    (osqp-update-data-vec *mpc-solver* c-null l-vec-c u-vec-c)))))))
+	    
+	    (osqp-update-data-vec *mpc-solver*
+				  c-null
+				  l-vec-c
+				  u-vec-c)))))))
+
+(defun mpc-matrix-update-p (p-mat)
+  (let ((p-mat-floats (float-list->vector-list
+		       (list->float-list p-mat))))
+    (cffi:with-foreign-array (p-mat-c p-mat-floats `(:array
+						     :double
+						     ,(length p-mat-floats)))
+      (let ((c-null (cffi:null-pointer)))
+	(osqp-update-data-mat *mpc-solver*
+			      p-mat-c c-null (length p-mat)
+			      c-null c-null 0)))))
 
 
-(defun mpc-matrix-update-pq (p-mat q)
-  (let ((p-mat-floats (list->float-list p-mat))
-	(q-floats (list->float-list q)))
-    (cffi:with-foreign-array (p-mat-c p-mat-floats :double)
-      (cffi:with-foreign-array (q-vec-c q-floats :double)
-	(let ((c-null (cffi:null-pointer)))
-	    (osqp-update-data-mat *mpc-solver*
-				  p-mat-c c-null (length p-mat)
-				  c-null c-null 0)
-	    (osqp-update-data-vec *mpc-solver* q-vec-c c-null c-null))))))
+(defun mpc-matrix-update-q (q-vec)
+  (let ((q-floats (float-list->vector-list
+		   (list->float-list q-vec))))
+    (cffi:with-foreign-array (q-vec-c q-floats `(:array
+						 :double
+						 ,(length q-floats)))
+      (let ((c-null (cffi:null-pointer)))
+	(osqp-update-data-vec *mpc-solver* q-vec-c c-null c-null)))))
 
 (defun solve-mpc ()
   (if (not *mpc-solver*)
@@ -205,14 +240,14 @@
                 collect (cffi:mem-aref x-ptr :double i))))))
 
 
-;; (set-mpc-problem '(3 2) 
-;;                  '((4.0 1.0 2.0) (0 0 1) (0 1 3))
-;;                  '(1.0 1.0)
-;;                  '((1.0 1.0 1.0 1.0) (0 1 0 2) (0 2 4))
-;;                  '(1.0 0.0 0.0)
-;;                  '(1.0 0.7 0.7))
+(set-mpc-problem '(3 2) 
+                 '((4.0 1.0 2.0) (0 0 1) (0 1 3))
+                 '(1.0 1.0)
+                 '((1.0 1.0 1.0 1.0) (0 1 0 2) (0 2 4))
+                 '(1.0 0.0 0.0)
+                 '(1.0 0.7 0.7))
 
 
-;; (time 
-;;  (solve-mpc))
+(time 
+ (solve-mpc))
 
