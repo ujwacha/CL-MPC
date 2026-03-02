@@ -44,11 +44,10 @@
 
 (defun socket-open-udp (host port)
   (if (not (eq *connection-socket* 'nil))
-      (usocket:socket-close *connection-socket*)
-      (setf *connection-socket*
+      (usocket:socket-close *connection-socket*))
+  (setf *connection-socket*
 	    (usocket:socket-connect host port
-				    :protocol :datagram
-				    ))))
+				    :protocol :datagram)))
 
 (defun socket-clean ()
   (if (not (eq *connection-socket* 'nil))
@@ -98,4 +97,19 @@
   (kill-recieve-thread)
   (setf *message-recieve-thread*
 	(bt:make-thread 'socket-read-thered)))
+
+
+;; (socket-open-udp "localhost" 9999)
+
+;; (send-socket-data (floats->bytes '(222.85)))
+
+;; (make-recieve-theread)
+
+;; (read-udp-message)
+
+;; (kill-recieve-thread)
+
+;; ;; ;;; 
+;; ;; ;; (kill-recieve-thread)
+;; (socket-clean)
 
