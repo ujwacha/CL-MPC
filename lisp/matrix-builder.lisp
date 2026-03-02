@@ -343,8 +343,9 @@
 
 (defun try-nth (n op-list)
   (if (>= n (length op-list))
-      (car op-list)
+      (nth (1- (length op-list)) op-list)
       (nth n op-list)))
+
 
 (defun get-sparse-a-l-u (time-horizon
 			 state-jacobians
@@ -477,4 +478,45 @@
 			  )))
       (list A L U))
     ))
+
+
+
+(list-matrix->csc-list
+ (car 
+  (get-a-l-u-matrix 2 '((67 2) (3 4)) '((7 6)) '(a b) '(3 4) '(c) '((-10) (10))
+		    (state-limit-symbolic->list '(a b)
+						-1
+						'((+ ( * 2  a) b))
+						10)
+		    )
+  ))
+
+(get-sparse-a-l-u 2 '(((67 2) (3 4)))
+		  '(((7 6)))
+		  '(a b)
+		  '(3 4)
+		  '(c)
+		  '((-10) (10))
+		  (state-limit-symbolic->list '(a b)
+					      -1
+					      '((+ ( * 2  a) b))
+					      10))
+
+
+
+(MAT-CONSTANT-MUL -1 '(67 2))
+
+
+(3 4 0 0 0 0 -1000.0 -1000.0 NIL NIL)
+(3 4 0 0 0 0 -1000.0 -1000.0 NIL NIL)
+
+(3 4 0 0 0 0 1000.0 1000.0 NIL NIL)
+(3 4 0 0 0 0 1000.0 1000.0 NIL NIL)
+
+(mapcar (lambda (x y) (- x y)) 
+	'(1 -67 -2 1 -3 -4 1 -67 -2 1 -3 -4 1 1 -7 -6 1 -7 -6 1)
+	'(1 -67 -2 1 -3 -4 1 -67 -2 1 -3 -4 1 1 -7 -6 1 -7 -6 1))
+
+
+
 
