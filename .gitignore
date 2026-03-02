@@ -2,3 +2,9 @@
 /lisp/main.lisp~
 /lisp/symbolic.lisp~
 /mpc-control.asd~
+/compile.sh~
+/lisp/mpc.lisp~
+/lisp/run.lisp~
+/lisp/udp.lisp~
+/test.c~
+/web/matrix-visualizer.html~

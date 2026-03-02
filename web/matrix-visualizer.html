@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Common Lisp matrix visualizer · dynamic dimensions</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
+        }
+        body {
+            background: linear-gradient(145deg, #f0f5fa 0%, #e2eef9 100%);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+        }
+        .card {
+            max-width: 12000px;
+            width: 100%;
+            margin: 20px auto;
+            background: rgba(255,255,255,0.8);
+            backdrop-filter: blur(4px);
+            border-radius: 2.5rem;
+            box-shadow: 0 30px 60px -15px rgba(0,30,60,0.3);
+            padding: 2rem;
+            border: 1px solid rgba(255,255,255,0.7);
+        }
+        h2 {
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            font-size: 2rem;
+            letter-spacing: -0.02em;
+            color: #0a2a44;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        h2 span {
+            background: #1e3a5f;
+            color: white;
+            font-size: 0.9rem;
+            font-weight: 400;
+            padding: 0.2rem 1rem;
+            border-radius: 40px;
+            background: #2b4b74;
+        }
+        .sub {
+            color: #2c3e4f;
+            margin-bottom: 2rem;
+            font-size: 1rem;
+            border-left: 5px solid #5b8cbc;
+            padding-left: 1rem;
+            background: #e5eff9b0;
+            border-radius: 0 12px 12px 0;
+            line-height: 1.5;
+        }
+        .editor-panel {
+            background: #ffffffd6;
+            border-radius: 28px;
+            padding: 1.5rem 1.8rem;
+            margin-bottom: 2.2rem;
+            box-shadow: 0 12px 24px -16px #1e3f60;
+            border: 1px solid #ffffff;
+        }
+        .editor-panel label {
+            font-weight: 600;
+            color: #103450;
+            display: block;
+            margin-bottom: 12px;
+            font-size: 1.2rem;
+        }
+        textarea {
+            width: 100%;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            padding: 1.2rem;
+            border-radius: 20px;
+            border: 2px solid #c7ddec;
+            background: #fafdff;
+            resize: vertical;
+            white-space: pre;
+            overflow-x: auto;
+            color: #1e3b55;
+            font-weight: 400;
+            box-shadow: inset 0 2px 6px #d9e2ec;
+        }
+        textarea:focus {
+            border-color: #6797c7;
+            outline: none;
+            background: #ffffff;
+        }
+        .button-bar {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+            align-items: center;
+        }
+        .btn {
+            background: white;
+            border: 2px solid #9bb9da;
+            padding: 12px 28px;
+            border-radius: 60px;
+            font-weight: 600;
+            font-size: 1rem;
+            color: #113c5e;
+            cursor: pointer;
+            transition: all 0.15s;
+            box-shadow: 0 4px 8px rgba(0,30,50,0.08);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-primary {
+            background: #1d4e7c;
+            border-color: #113e61;
+            color: white;
+            box-shadow: 0 8px 16px -8px #1d4e7c80;
+        }
+        .btn-primary:hover {
+            background: #256394;
+            border-color: #1a4972;
+            transform: scale(1.02);
+        }
+        .btn:hover {
+            background: #e6f0fa;
+            border-color: #7fa6cc;
+        }
+        .error-message {
+            background: #ffefe6;
+            border-radius: 40px;
+            padding: 12px 24px;
+            color: #b13e3e;
+            font-weight: 500;
+            border: 2px solid #f3bfbf;
+            margin-top: 16px;
+        }
+        .matrix-container {
+            overflow-x: auto;
+            border-radius: 24px;
+            background: #ffffffc4;
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.05), 0 12px 28px -8px rgba(0,35,70,0.2);
+            padding: 18px 12px;
+            border: 1px solid rgba(255,255,255,0.7);
+        }
+        table {
+            border-collapse: collapse;
+            margin: 0 auto;
+            font-size: 1.2rem;
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 6px 18px rgba(0,20,40,0.12);
+            min-width: 600px;
+        }
+        th {
+            background: #f0f7fd;
+            font-weight: 500;
+            color: #113355;
+            font-size: 0.95rem;
+            padding: 14px 8px;
+            border-bottom: 2px solid #aac3d9;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        td {
+            border: 1px solid #d4e0ec;
+            padding: 14px 12px;
+            text-align: center;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-weight: 500;
+            transition: background 0.1s ease;
+            background-color: #ffffff;
+            min-width: 70px;
+        }
+        td.value-cell {
+            background-color: #d2e6ff;
+            color: #0b2d4b;
+            font-weight: 600;
+            box-shadow: inset 0 0 0 1px #7fabdf;
+        }
+        td.value-cell.negative {
+            background-color: #ffdede;
+            color: #a0002a;
+            box-shadow: inset 0 0 0 1px #d86a6a;
+        }
+        td.nil-cell {
+            background-color: #f2f6fa;
+            color: #7b8b9f;
+            font-size: 1rem;
+            font-weight: 300;
+        }
+        td:first-child, th:first-child {
+            padding-left: 16px;
+        }
+        td:last-child, th:last-child {
+            padding-right: 16px;
+        }
+        .row-label, .col-label {
+            background: #e2ecf9;
+            font-weight: 600;
+            color: #1c3f5c;
+            border-bottom: 2px solid #a7c0da;
+            font-size: 1rem;
+            letter-spacing: 0.3px;
+        }
+        .row-label {
+            background: #e8f0fa;
+            border-right: 2px solid #b6cde3;
+        }
+        .corner {
+            background: #cbddec;
+            border-right: 2px solid #b6cde3;
+            border-bottom: 2px solid #a7c0da;
+            font-weight: 600;
+            color: #0e304b;
+        }
+        .footnote {
+            margin-top: 26px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            color: #1e3e5c;
+            background: #f4fafeb0;
+            padding: 0.9rem 1.5rem;
+            border-radius: 48px;
+            font-size: 0.95rem;
+            border: 1px solid white;
+        }
+        .legend {
+            display: flex;
+            gap: 28px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .legend-dot {
+            width: 24px;
+            height: 24px;
+            border-radius: 8px;
+            background: #d2e6ff;
+            border: 1px solid #7fabdf;
+        }
+        .legend-dot.nil {
+            background: #f2f6fa;
+            border: 1px dashed #9aaec2;
+        }
+        .legend-dot.negative {
+            background: #ffdede;
+            border: 1px solid #d86a6a;
+        }
+        pre {
+            background: #1b2b3f;
+            color: #f0e6d0;
+            padding: 1.2rem;
+            border-radius: 18px;
+            font-size: 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-width: 450px;
+            box-shadow: inset 0 0 0 1px #2d4b6e;
+            margin: 0;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h2>
+        🧮 Common Lisp matrix visualizer · column‑major
+        <span id="matrix-dimensions">10 rows × 8 columns</span>
+    </h2>
+    <div class="sub">
+        ⬇️ Edit in native Lisp syntax – numbers like <code>1.96d0</code>, <code>-2.5e-4</code>, <code>3f2</code> are supported.<br>
+        Outer list = columns, each inner list = rows. Dimensions are detected automatically.
+    </div>
+
+    <div class="editor-panel">
+        <label for="matrix-input">📋 Column‑major input (Lisp list of lists):</label>
+        <textarea id="matrix-input" rows="8">((1 NIL -67 -2 NIL NIL NIL NIL NIL NIL)
+ (NIL 1 -3 -4 NIL NIL NIL NIL NIL NIL)
+ (NIL NIL 1 NIL -67 -2 NIL NIL 2 NIL)
+ (NIL NIL NIL 1 -3 -4 NIL NIL 1 NIL)
+ (NIL NIL NIL NIL 1 NIL NIL NIL NIL 2)
+ (NIL NIL NIL NIL NIL 1 NIL NIL NIL 1)
+ (NIL NIL -7 -6 NIL NIL 1 NIL NIL NIL)
+ (NIL NIL NIL NIL -7 -6 NIL 1 NIL NIL))</textarea>
+        <div class="button-bar">
+            <button class="btn btn-primary" id="update-btn">⟳ Update matrix</button>
+            <button class="btn" id="reset-btn">↺ Reset to example</button>
+        </div>
+        <div id="error-display" class="error-message" style="display: none;"></div>
+    </div>
+
+    <div class="matrix-container">
+        <table id="matrix-table">
+            <!-- filled by js -->
+        </table>
+    </div>
+
+    <div class="footnote">
+        <div class="legend">
+            <div class="legend-item"><span class="legend-dot"></span> positive / non‑zero</div>
+            <div class="legend-item"><span class="legend-dot negative"></span> negative value</div>
+            <div class="legend-item"><span class="legend-dot nil"></span> NIL (empty)</div>
+        </div>
+        <span style="font-weight:500;">dash <code>—</code> = NIL</span>
+    </div>
+</div>
+
+<script>
+(function() {
+    // DOM elements
+    const table = document.getElementById('matrix-table');
+    const textarea = document.getElementById('matrix-input');
+    const updateBtn = document.getElementById('update-btn');
+    const resetBtn = document.getElementById('reset-btn');
+    const errorDiv = document.getElementById('error-display');
+    const dimSpan = document.getElementById('matrix-dimensions');
+
+    // original example as string (pretty printed)
+    const ORIGINAL_INPUT = `((1 NIL -67 -2 NIL NIL NIL NIL NIL NIL)
+ (NIL 1 -3 -4 NIL NIL NIL NIL NIL NIL)
+ (NIL NIL 1 NIL -67 -2 NIL NIL 2 NIL)
+ (NIL NIL NIL 1 -3 -4 NIL NIL 1 NIL)
+ (NIL NIL NIL NIL 1 NIL NIL NIL NIL 2)
+ (NIL NIL NIL NIL NIL 1 NIL NIL NIL 1)
+ (NIL NIL -7 -6 NIL NIL 1 NIL NIL NIL)
+ (NIL NIL NIL NIL -7 -6 NIL 1 NIL NIL))`;
+
+    // ----- convert a Common Lisp number token to JavaScript number -----
+    function parseLispNumber(token) {
+        // integer (including negative)
+        if (/^[+-]?\d+$/.test(token)) {
+            return Number(token);
+        }
+
+        // try to normalize Lisp float syntax: replace d, D, f, F, l, L, s, S with e (keeping exponent)
+        let normalized = token.replace(/[dDfFlLsS]([+-]?\d+)?$/, (match, exp) => {
+            return exp !== undefined ? 'e' + exp : 'e0';
+        });
+        let num = parseFloat(normalized);
+        if (isNaN(num)) {
+            throw new Error(`Invalid number format: "${token}"`);
+        }
+        return num;
+    }
+
+    // ----- recursive Lisp parser (handles parentheses, NIL, numbers with d/f/l/s exponents) -----
+    function parseLisp(str) {
+        let s = str.trim();
+        let index = 0;
+
+        function isWhitespace(ch) {
+            return ch === ' ' || ch === '\n' || ch === '\t' || ch === '\r';
+        }
+
+        function skipWhitespace() {
+            while (index < s.length && isWhitespace(s[index])) index++;
+        }
+
+        function parseValue() {
+            skipWhitespace();
+            if (index >= s.length) throw new Error('Unexpected end of input');
+
+            if (s[index] === '(') {
+                // start of a list
+                index++; // skip '('
+                skipWhitespace();
+                let arr = [];
+                while (index < s.length && s[index] !== ')') {
+                    arr.push(parseValue());
+                    skipWhitespace();
+                }
+                if (index >= s.length || s[index] !== ')') {
+                    throw new Error('Missing closing )');
+                }
+                index++; // skip ')'
+                return arr;
+            } else {
+                // parse atom: number or NIL
+                let start = index;
+                while (index < s.length && s[index] !== '(' && s[index] !== ')' && !isWhitespace(s[index])) {
+                    index++;
+                }
+                let token = s.substring(start, index);
+                if (token === '') throw new Error('Empty token');
+
+                let upper = token.toUpperCase();
+                if (upper === 'NIL') {
+                    return null;
+                }
+
+                // try to interpret as Lisp number
+                try {
+                    return parseLispNumber(token);
+                } catch (e) {
+                    throw new Error(`Invalid token: "${token}" – expected number or NIL`);
+                }
+            }
+        }
+
+        let result = parseValue();
+        skipWhitespace();
+        if (index < s.length) {
+            throw new Error('Extra characters after end of expression');
+        }
+        if (!Array.isArray(result)) {
+            throw new Error('Top-level must be a list (starting with "(")');
+        }
+        return result; // returns an array of columns (each column is an array)
+    }
+
+    // ----- validate dimensions: all columns must have same length -----
+    function validateColumns(columns) {
+        const numCols = columns.length;
+        if (numCols === 0) {
+            throw new Error('Matrix must have at least one column');
+        }
+        const firstColLength = columns[0].length;
+        if (firstColLength === 0) {
+            throw new Error('Column 0 is empty – each column must contain at least one element');
+        }
+        for (let c = 1; c < numCols; c++) {
+            if (!Array.isArray(columns[c]) || columns[c].length !== firstColLength) {
+                throw new Error(`Column ${c} has length ${columns[c]?.length ?? 'undefined'}, but column 0 has length ${firstColLength}. All columns must have the same length.`);
+            }
+        }
+        // ensure each element is number or null (already done by parser)
+        return { rows: firstColLength, cols: numCols };
+    }
+
+    // ----- render table from columns (column-major data) -----
+    function renderMatrix(columns, rows, cols) {
+        // Build row-major 2D array
+        const matrix = Array.from({ length: rows }, () => Array(cols).fill(null));
+        for (let col = 0; col < cols; col++) {
+            for (let row = 0; row < rows; row++) {
+                matrix[row][col] = columns[col][row];
+            }
+        }
+
+        // helper for cell class
+        function cellClass(value) {
+            if (value === null || value === undefined) return 'nil-cell';
+            if (typeof value === 'number' && value < 0) return 'value-cell negative';
+            return 'value-cell';
+        }
+
+        // Clear table
+        table.innerHTML = '';
+
+        // Build thead
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        const cornerTh = document.createElement('th');
+        cornerTh.className = 'corner';
+        cornerTh.textContent = 'row/col';
+        headerRow.appendChild(cornerTh);
+        for (let c = 0; c < cols; c++) {
+            const th = document.createElement('th');
+            th.className = 'col-label';
+            th.textContent = `col ${c}`;
+            headerRow.appendChild(th);
+        }
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        // Build tbody
+        const tbody = document.createElement('tbody');
+        for (let r = 0; r < rows; r++) {
+            const tr = document.createElement('tr');
+            const rowHeader = document.createElement('td');
+            rowHeader.className = 'row-label';
+            rowHeader.textContent = `row ${r}`;
+            tr.appendChild(rowHeader);
+
+            for (let c = 0; c < cols; c++) {
+                const val = matrix[r][c];
+                const td = document.createElement('td');
+                td.className = cellClass(val);
+                td.textContent = (val === null || val === undefined) ? '—' : val;
+                tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+        }
+        table.appendChild(tbody);
+    }
+
+    // ----- update dimension display -----
+    function updateDimensionDisplay(rows, cols) {
+        dimSpan.textContent = `${rows} row${rows !== 1 ? 's' : ''} × ${cols} column${cols !== 1 ? 's' : ''}`;
+    }
+
+    // ----- update from textarea content -----
+    function updateFromTextarea() {
+        const raw = textarea.value.trim();
+        if (raw === '') {
+            showError('Input is empty');
+            return;
+        }
+        try {
+            const parsed = parseLisp(raw);
+            const { rows, cols } = validateColumns(parsed);
+            hideError();
+            renderMatrix(parsed, rows, cols);
+            updateDimensionDisplay(rows, cols);
+        } catch (e) {
+            showError(e.message);
+        }
+    }
+
+    // ----- reset to original example -----
+    function resetToOriginal() {
+        textarea.value = ORIGINAL_INPUT;
+        updateFromTextarea();
+    }
+
+    function showError(msg) {
+        errorDiv.style.display = 'block';
+        errorDiv.textContent = '❌ ' + msg;
+    }
+
+    function hideError() {
+        errorDiv.style.display = 'none';
+    }
+
+    // ----- attach events -----
+    updateBtn.addEventListener('click', updateFromTextarea);
+    resetBtn.addEventListener('click', resetToOriginal);
+
+    // initial render from default textarea
+    window.addEventListener('load', () => {
+        textarea.value = ORIGINAL_INPUT;
+        updateFromTextarea();
+    });
+})();
+</script>
+
+<!-- extra hover styling -->
+<style>
+    td:hover { filter: brightness(0.97); transform: scale(1.02); transition: 0.1s; z-index: 3; box-shadow: 0 0 0 2px #98b9dd; }
+    td.row-label:hover { filter: brightness(1.05); background: #dae5f2; }
+    .corner:hover { filter: brightness(1.03); }
+    table td { transition: all 0.1s ease; }
+    td.nil-cell:hover { background: #e0e9f2; }
+</style>
+
+</body>
+</html>
