@@ -97,11 +97,11 @@
 
 
 (defun jacobian (state transition)
-  (mapcar (lambda (trans)
-            (mapcar (lambda (var)
+  (mapcar (lambda (var)
+            (mapcar (lambda (trans)
 		      (simplify  (diff trans var)))
-                    state))
-          transition))
+                    transition))
+          state))
 
 
 (defun get-lambda (vars matrix)
@@ -113,5 +113,13 @@
 
 (defun state-limit-symbolic->list (state-vector u inequality l)
   (list u
-	(alexandria:flatten  (jacobian state-vector inequality))
+	(jacobian state-vector inequality)
 	l))
+
+(state-limit-symbolic->list '(a b)
+			    -10
+			    '((+ a b))
+			    0)
+
+(jacobian '(a b)
+	  '((+ a b)))
