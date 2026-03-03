@@ -46,10 +46,10 @@
 
 (defun get-q (time-horizon trajectory initial-state state-symbols control-symbols)
   (if (not (and (<= time-horizon (length trajectory))
-		(eq (length state-symbols) (length  (car trajectory)))))
-      (error "Trajectory length must be greater than Time Horizon must be equal")
+		(= (length state-symbols) (length (car trajectory)))))
+      (error "Trajectory length must be greater or equal to Time Horizon")
       (let ((traj (subseq trajectory 0 time-horizon)))
-	(mapcar (lambda (x) (* 2 (- x)))
+	(mapcar (lambda (x) (* 3 (- x)))
 		(alexandria:flatten
 		 (concatenate 'list initial-state traj
 			      (mapcar (lambda (x)
@@ -491,31 +491,31 @@
 		    )
   ))
 
-(get-sparse-a-l-u 2 '(((67 2) (3 4)))
-		  '(((7 6)))
-		  '(a b)
-		  '(3 4)
-		  '(c)
-		  '((-10) (10))
-		  (state-limit-symbolic->list '(a b)
-					      -1
-					      '((+ ( * 2  a) b))
-					      10))
+;; (get-sparse-a-l-u 2 '(((67 2) (3 4)))
+;; 		  '(((7 6)))
+;; 		  '(a b)
+;; 		  '(3 4)
+;; 		  '(c)
+;; 		  '((-10) (10))
+;; 		  (state-limit-symbolic->list '(a b)
+;; 					      -1
+;; 					      '((+ ( * 2  a) b))
+;; 					      10))
 
 
 
-(MAT-CONSTANT-MUL -1 '(67 2))
+;; (MAT-CONSTANT-MUL -1 '(67 2))
 
 
-(3 4 0 0 0 0 -1000.0 -1000.0 NIL NIL)
-(3 4 0 0 0 0 -1000.0 -1000.0 NIL NIL)
+;; (3 4 0 0 0 0 -1000.0 -1000.0 NIL NIL)
+;; (3 4 0 0 0 0 -1000.0 -1000.0 NIL NIL)
 
-(3 4 0 0 0 0 1000.0 1000.0 NIL NIL)
-(3 4 0 0 0 0 1000.0 1000.0 NIL NIL)
+;; (3 4 0 0 0 0 1000.0 1000.0 NIL NIL)
+;; (3 4 0 0 0 0 1000.0 1000.0 NIL NIL)
 
-(mapcar (lambda (x y) (- x y)) 
-	'(1 -67 -2 1 -3 -4 1 -67 -2 1 -3 -4 1 1 -7 -6 1 -7 -6 1)
-	'(1 -67 -2 1 -3 -4 1 -67 -2 1 -3 -4 1 1 -7 -6 1 -7 -6 1))
+;; (mapcar (lambda (x y) (- x y)) 
+;; 	'(1 -67 -2 1 -3 -4 1 -67 -2 1 -3 -4 1 1 -7 -6 1 -7 -6 1)
+;; 	'(1 -67 -2 1 -3 -4 1 -67 -2 1 -3 -4 1 1 -7 -6 1 -7 -6 1))
 
 
 
