@@ -6,7 +6,7 @@
 (defparameter *states*   '(theta omega x v))
 (defparameter *controls* '(a))
 
-(defparameter *horizon* 200)
+(defparameter *horizon* 50)
 
 (defparameter *state-weights*
   '((10   0   0   0)
@@ -22,6 +22,14 @@
 (defparameter *control-limits*
   '((-30.0) (30.0)))
 
+(defparameter *state-limits*
+  (state-limit-symbolic->list
+   *states*
+   -0.5
+   '((+ theta))
+   +0.5)
+  )
+
 ;; State transition (symbolic, delt/g/invr2 spliced in at load time)
 (defparameter *state-transition*
   `((+ theta (* omega ,*delt*))
@@ -29,11 +37,21 @@
     (+ x (* v ,*delt*))
     (+ v (* a ,*delt*))))
 
+
+(defun get-transition-lambda (vars function-list)
+  `(lambda (,@vars) (list ,@function-list)))
+
+
+(defparameter *f-fn*
+  (compile nil
+	   (get-transition-lambda (append *states* *controls*)
+				  *state-transition*)))
+
 ;; Compile numerical Jacobian functions
 (defparameter *a-fn*
-  (compile nil
-    (get-lambda (append *states* *controls*)
-                (jacobian *states* *state-transition*))))
+    (compile nil
+	     (get-lambda (append *states* *controls*)
+			 (jacobian *states* *state-transition*))))
 
 (defparameter *b-fn*
   (compile nil
@@ -41,7 +59,7 @@
                 (jacobian *controls* *state-transition*))))
 
 
-(defparameter *current-state* '(-0.6 0 5 0))
+(defparameter *current-state* '(-0.3 0 5 0))
 (defparameter *current-control* '(0))
 
 
@@ -55,12 +73,16 @@
 ;; make Q vector
 
 
+(defun trajectory-to-state-q (current-state final-state)
+  (let ((traj (loop for i from 0 to *horizon*
+			collect final-state)))
+	(get-q *horizon* traj current-state '(theta omega x v) '(a))))
+
+
 (defvar *initial-q* nil)
 
 (setf *initial-q* 
-      (let ((traj (loop for i from 0 to *horizon*
-			collect '(0 0 2.5 0))))
-	(get-q *horizon* traj '(0 0 1 0) '(theta omega x v) '(a))))
+      (trajectory-to-state-q *current-state* '(0 0 2.5 0)))
 
 
 
@@ -132,11 +154,8 @@
 			     *states*
 			     *current-state*
 			     *controls*
-			     '((-100) (100))
-			     (state-limit-symbolic->list *states*
-							 -1000
-							 '((+ 0 0))
-							 1000)
+			     *control-limits*
+			     *state-limits*
 			     )))
     alu-matrix))
 
@@ -206,33 +225,55 @@
 						       *states*
 						       new-state
 						       *controls*
-						       '((-100) (100))
-						       (state-limit-symbolic->list
-							*states*
-							-1999
-							'((+ 0 0))
-							1000))
+						       *control-limits*
+						       *state-limits*)
 	       (mpc-matrix-update-alu a-upd l-upd u-upd)
 	       ))))
 
 
-(try-converge-non-linear 10)
+(try-converge-non-linear *horizon*)
 
 ;; (run-mpc-once)
-(solved-to-proper-list  (solve-mpc)
-			*states*
-			*controls*
-			*horizon*)
+
+(loop for times from 0 to 600
+      do
+	 (destructuring-bind (states controls) (solved-to-proper-list
+						(solve-mpc)
+						*states*
+						*controls*
+						*horizon*)
+	   
+	   (let* ((next-state ;; (car (cdr states))
+			      (apply *f-fn* (append (car states) (car controls))))
+		  (next-control (car (cdr controls)))
+		  (planned-traj (trajectory-to-state-q next-state
+						       '(0 0 5.5 0)))
+		  (state-control-list (mapcar (lambda (x y) (append x y))
+					      (cdr states) controls))
+		  
+		  (new-jac-states (mapcar (lambda (x) (apply *a-fn* x))
+					  state-control-list))
+		  
+		  (new-jac-controls (mapcar (lambda (x) (apply *b-fn* x))
+					    state-control-list))
+
+		  (new-alu (get-sparse-a-l-u *horizon*
+					     new-jac-states
+					     new-jac-controls
+					     *states*
+					     next-state
+					     *controls*
+					     *control-limits*
+					     *state-limits*))
+		  )
+	     (destructuring-bind (a-mat l-vec u-vec ) new-alu
+	       (mpc-matrix-update-alu a-mat l-vec u-vec))
+	     (try-converge-non-linear 1)
+	     (mpc-matrix-update-q planned-traj))))
 
 
-;; (loop for i from 0 below 100
-;;       do
-;; 	 (solved-to-proper-list (solve-mpc)
-;; 				*states*
-;; 				*controls*
-;; 				*horizon*
-;; 				))
-
-
-
+(solved-to-proper-list (solve-mpc)
+		       *states*
+		       *controls*
+		       *horizon*)
 
