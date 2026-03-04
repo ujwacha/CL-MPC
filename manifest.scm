@@ -13,6 +13,7 @@
 		     cpp
 		     python
 		     python-web
+		     python-xyz
 		     compression
 		     gdb)
 
@@ -37,6 +38,8 @@
    ;; python
    python-websockets
    python
+   python-matplotlib
+   
    ;; Build tools
    coreutils
    glibc
