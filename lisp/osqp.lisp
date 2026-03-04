@@ -113,6 +113,9 @@
 					  (setf *mpc-solver* 'nil)))
   )
 
+
+(ALL-C-VARS-FREE)
+
 (defun set-mpc-problem (dim p q a l u)
   (all-c-vars-free)
   (print "all vars cleared")
@@ -228,26 +231,95 @@
       (let ((c-null (cffi:null-pointer)))
 	(osqp-update-data-vec *mpc-solver* q-vec-c c-null c-null)))))
 
+;; OSQP status_val codes (from osqp/constants.h):
+;;   1   OSQP_SOLVED
+;;   2   OSQP_SOLVED_INACCURATE   -- tolerances not fully met, solution usable
+;;  -2   OSQP_PRIMAL_INFEASIBLE   -- state/constraints are contradictory
+;;  -3   OSQP_DUAL_INFEASIBLE     -- cost is unbounded (bad weights or limits)
+;;  -4   OSQP_PRIMAL_OR_DUAL_INFEASIBLE
+;;  -5   OSQP_SIGINT
+;;  -7   OSQP_TIME_LIMIT_REACHED
+;; -10   OSQP_UNSOLVED            -- solve() not called yet
+
+(defun osqp-status-string (status-val)
+  (case status-val
+    (1    "solved")
+    (2    "solved (inaccurate)")
+    (-2   "primal infeasible")
+    (-3   "dual infeasible")
+    (-4   "primal or dual infeasible")
+    (-5   "interrupted (SIGINT)")
+    (-7   "time limit reached")
+    (-10  "unsolved")
+    (otherwise (format nil "unknown (~a)" status-val))))
+
 (defun solve-mpc ()
-  (if (not *mpc-solver*)
-      (error "Run (set-mpc-problem ...) first.")
-      (progn
-        (osqp-solve *mpc-solver*)
-        (let* ((sol-raw (osqp-solver.solution *mpc-solver*))
-               (sol-wrap (make-osqp-solution :ptr sol-raw))
-               (x-ptr (osqp-solution.x sol-wrap)))
-          (loop for i from 0 below *n*
-                collect (cffi:mem-aref x-ptr :double i))))))
+  (unless *mpc-solver*
+    (error "Run (set-mpc-problem ...) first."))
+
+  ;; osqp-solve returns an exitflag for hard API errors only (e.g. null pointer).
+  ;; Infeasibility is NOT signalled here -- it shows up in info->status_val.
+  (let ((exitflag (osqp-solve *mpc-solver*)))
+    (unless (= 0 exitflag)
+      (error "osqp-solve API error: exitflag=~a" exitflag)))
+
+  (let* ((info-raw   (osqp-solver.info *mpc-solver*))
+         (info-wrap  (make-osqp-info :ptr info-raw))
+         (status-val (osqp-info.status-val info-wrap))
+         (obj-val    (osqp-info.obj-val    info-wrap))
+         (iter       (osqp-info.iter       info-wrap)))
+
+    (case status-val
+
+      ;; ── Good solutions ────────────────────────────────────────────────────
+      (1  ; OSQP_SOLVED
+       (let* ((sol-raw  (osqp-solver.solution *mpc-solver*))
+              (sol-wrap (make-osqp-solution :ptr sol-raw))
+              (x-ptr    (osqp-solution.x sol-wrap)))
+         (loop for i from 0 below *n*
+               collect (cffi:mem-aref x-ptr :double i))))
+
+      (2  ; OSQP_SOLVED_INACCURATE -- tolerances not fully met but x is valid
+       (format t "[OSQP] solved inaccurate after ~a iters (obj=~,4f) -- accepting~%"
+               iter obj-val)
+       (let* ((sol-raw  (osqp-solver.solution *mpc-solver*))
+              (sol-wrap (make-osqp-solution :ptr sol-raw))
+              (x-ptr    (osqp-solution.x sol-wrap)))
+         (loop for i from 0 below *n*
+               collect (cffi:mem-aref x-ptr :double i))))
+
+      ;; ── Infeasibility ─────────────────────────────────────────────────────
+      ;; These signal distinct conditions so call-sites in run.lisp can decide
+      ;; whether to re-initialise the QP, relax constraints, or just send zero.
+      (-2
+       (error "OSQP primal infeasible: current state likely violates constraints. ~
+               Check *state-limits* and *control-limits*."))
+
+      (-3
+       (error "OSQP dual infeasible: cost function is unbounded. ~
+               Check *state-weights* and *control-weights* are positive definite."))
+
+      (-4
+       (error "OSQP primal or dual infeasible."))
+
+      ;; ── Other failures ────────────────────────────────────────────────────
+      (-7
+       (error "OSQP time limit reached after ~a iterations." iter))
+
+      (-5
+       (error "OSQP interrupted by SIGINT."))
+
+      (otherwise
+       (error "OSQP unexpected status: ~a" (osqp-status-string status-val))))))
 
 
-(set-mpc-problem '(3 2) 
-                 '((4.0 1.0 2.0) (0 0 1) (0 1 3))
-                 '(1.0 1.0)
-                 '((1.0 1.0 1.0 1.0) (0 1 0 2) (0 2 4))
-                 '(1.0 0.0 0.0)
-                 '(1.0 0.7 0.7))
+;; (set-mpc-problem '(3 2) 
+;;                  '((4.0 1.0 2.0) (0 0 1) (0 1 3))
+;;                  '(1.0 1.0)
+;;                  '((1.0 1.0 1.0 1.0) (0 1 0 2) (0 2 4))
+;;                  '(1.0 0.0 0.0)
+;;                  '(1.0 0.7 0.7))
 
 
-(time 
- (solve-mpc))
-
+;; (time 
+;;  (solve-mpc))
