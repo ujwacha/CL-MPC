@@ -43,18 +43,35 @@
 	    (mapcar (lambda (elem) (* constant elem)) col))
 	  matrix))
 
+(defun repeat-zip (list1 list2)
+  (mapcar (lambda (x y) (list x y))
+	  list1
+	  (loop for i from 0 below (length list1) by (length list2)
+		append
+		list2)))
 
-(defun get-q (time-horizon trajectory initial-state state-symbols control-symbols)
+(defun get-diagonal-elements (list-matrix)
+  (loop for column in list-matrix
+	for i from 0
+	collect
+	(nth i column)))
+
+(defun get-q (time-horizon trajectory initial-state state-symbols control-symbols p-mat-diag)
   (if (not (and (<= time-horizon (length trajectory))
-		(= (length state-symbols) (length (car trajectory)))))
-      (error "Trajectory length must be greater or equal to Time Horizon")
+		(= (length state-symbols) (length (car trajectory)))
+		(= (length p-mat-diag) (length state-symbols))))
+      (error "Wrong Input Dimentions for Get-Q")
       (let ((traj (subseq trajectory 0 time-horizon)))
-	(mapcar (lambda (x) (* 3 (- x)))
-		(alexandria:flatten
-		 (concatenate 'list initial-state traj
-			      (mapcar (lambda (x)
-					(make-list  (length control-symbols) :initial-element 0))
-				      (range-get 0 time-horizon))))))))
+	(append 
+	 (mapcar (lambda (x) (destructuring-bind (a b) x
+			       (* a b -1)))
+		 (append (repeat-zip initial-state p-mat-diag)
+			 (loop for x in traj
+			       append
+			       (repeat-zip x p-mat-diag))))
+	 (loop for x from 0 below time-horizon
+	       append
+	       (make-list (length control-symbols) :initial-element 0))))))
 
 
 
