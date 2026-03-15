@@ -10,12 +10,12 @@
 (defparameter *delt*   0.02d0)
 
 (defparameter *states*   '(theta omega x v))
-(defparameter *controls* '(a))
+(defparameter *controls* '(a s1))
 
-(defparameter *horizon* 50)
+(defparameter *horizon* 35)
 
 (defparameter *state-weights*
-  '((10   0   0   0)
+  '((40   0   0   0)
     (0    0.5   0   0)
     (0    0   10   0)
     (0    0   0   0.1)))
@@ -24,23 +24,24 @@
 
 ;; Control weights  R  (1x1)
 (defparameter *control-weights*
-  '((0.1)))
+  '((0.1 0) (0 1000)))
 
 ;; Control limits  [a_min, a_max]
 (defparameter *control-limits*
-  '((-50.0) (50.0)))
+  '((-100.0 0)  (100.0 1000)))
 
-(defparameter *state-limits*
-  (state-limit-symbolic->list
-   *states*
-   -70000.0
-   '((+ 0))
-   +70000.0)
-  )
+(defparameter *state-limits* 'nil)
 
-
-
-
+(setq *state-limits*
+      (state-limit-symbolic->list
+       *states*
+       *controls*
+       '(-1000
+	 -0.5)
+       '((- theta s1)
+	 (+ theta s1))
+       '(0.5
+	 1000)))
 
 ;; State transition (symbolic, delt/g/invr2 spliced in at load time)
 (defparameter *state-transition*
@@ -61,9 +62,9 @@
 
 ;; Compile numerical Jacobian functions
 (defparameter *a-fn*
-    (compile nil
-	     (get-lambda (append *states* *controls*)
-			 (jacobian *states* *state-transition*))))
+  (compile nil
+	   (get-lambda (append *states* *controls*)
+		       (jacobian *states* *state-transition*))))
 
 (defparameter *b-fn*
   (compile nil
@@ -321,46 +322,6 @@
       (mpc-matrix-update-q planned-traj)
       (try-converge-non-linear 6)
       (list states controls))))
-
-
-;; (defun mpc-change-objective-to (current-state objective)
-;;   (if (not (= (length *states*)
-;; 	       (length current-state)
-;; 	       (length objective)))
-;;       (error "Dimention of current state or objective wrong"))
-;;   (destructuring-bind (states controls) (solved-to-proper-list
-;; 					 (solve-mpc)
-;; 					 *states*
-;; 					 *controls*
-;; 					 *horizon*)
-;;     (setf *target-state* objective)
-    
-;;     (let* ((next-state current-state)
-;; 	   (planned-traj (trajectory-to-state-q next-state
-;; 						objective))
-;; 	   (state-control-list (mapcar (lambda (x y) (append x y))
-;; 				       (cdr states) controls))
-	   
-;; 	   (new-jac-states (mapcar (lambda (x) (apply *a-fn* x))
-;; 				   state-control-list))
-	   
-;; 	   (new-jac-controls (mapcar (lambda (x) (apply *b-fn* x))
-;; 				     state-control-list))
-
-;; 	   (new-alu (get-sparse-a-l-u *horizon*
-;; 				      new-jac-states
-;; 				      new-jac-controls
-;; 				      *states*
-;; 				      next-state
-;; 				      *controls*
-;; 				      *control-limits*
-;; 				      *state-limits*)))
-      
-;;       (destructuring-bind (a-mat l-vec u-vec ) new-alu
-;; 	(mpc-matrix-update-alu a-mat l-vec u-vec))
-;;       (try-converge-non-linear *horizon*)
-;;       (mpc-matrix-update-q planned-traj)
-;;       (list states controls))))
 
 
 
