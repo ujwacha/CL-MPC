@@ -196,7 +196,7 @@
 	       (* time-horizon control-len)
 	       (if (eq 'nil state-limits)
 		   0
-		   (* time-horizon 1))))
+		   (* time-horizon (length (car state-limits))))))
 	 
 	 (n (+ (* (+ time-horizon 1) state-len)
 	       (* time-horizon control-len))) ;; no of cols
@@ -233,11 +233,21 @@
 					(range-get 0 time-horizon)))
 
 	 (state-limit-list (if (eq state-limits 'nil) ()
-			       (loop for i from 0 below time-horizon
-				     collect
-				     (let ((pos (list (+ n i)
-						      (* (+ i 1) state-len))))
-				       (list pos (nth 1 state-limits))))))
+			       (destructuring-bind (state-part-limit control-part-limit) (nth 1 state-limits)
+				 (loop for i from 0 below time-horizon
+				       nconc
+				       (let ((pos-state-lim (list (+ n
+								     (* i (length (car state-limits))))
+								  (* (1+ i) state-len)))
+					     (pos-control-lim (list (+ n
+								       (* i (length (car state-limits))))
+								    (+
+								     (* (1+ i) state-len)
+								     (* time-horizon state-len)
+								     ))))
+					 (list 
+					  (list pos-state-lim state-part-limit)
+					  (list pos-control-lim control-part-limit)))))))
 	 ) 
     ;;    state-limit-list
     (let ((A (reduce
@@ -283,7 +293,9 @@
 				   (range-get 0 time-horizon)))
 			  (make-list  time-horizon :initial-element (nth 2 state-limits))
 			  )))
-      (list A L U))
+      (list A
+	    (alexandria:flatten L)
+	    (alexandria:flatten U)))
     ))
 
 
@@ -382,7 +394,7 @@
 	       (* time-horizon control-len)
 	       (if (eq 'nil state-limits)
 		   0
-		   (* time-horizon 1))))
+		   (* time-horizon (length (car state-limits))))))
 	 
 	 (n (+ (* (+ time-horizon 1) state-len)
 	       (* time-horizon control-len))) ;; no of cols
@@ -440,19 +452,36 @@
 	 
 	 
 	 (state-limit-list (if (eq state-limits 'nil) ()
-			       (loop for i from 0 below time-horizon
-				     collect
-				     (let ((pos (list (+ n i)
-						      (* (+ i 1) state-len))))
-				       (list (list pos (nth 1 state-limits))))))))
+			       ;; (loop for i from 0 below time-horizon
+			       ;; 	     collect
+			       ;; 	     (let ((pos (list (+ n (* i
+			       ;; 				      (length (car state-limits))))
+			       ;; 			      (* (+ i 1) state-len))))
+			       ;; 	       (list (list pos (nth 1 state-limits)))))
+
+			       (destructuring-bind (state-part-limit control-part-limit) (nth 1 state-limits)
+				 (loop for i from 0 below time-horizon
+				       nconc
+				       (let ((pos-state-lim (list (+ n
+								     (* i (length (car state-limits))))
+								  (* (1+ i) state-len)))
+					     (pos-control-lim (list (+ n
+								       (* i (length (car state-limits))))
+								    (+
+								     (* (1+ i) state-len)
+								     (* time-horizon state-len)
+								     ))))
+					 (list
+					  (list (list pos-state-lim state-part-limit))
+					  (list (list pos-control-lim control-part-limit))))))
+			       )))
     
     (let ((A (alexandria:flatten
 	      (reduce (lambda (initial-matrix row-operation)
 
 			(reduce (lambda (initial pos-smatrix)
 				  (destructuring-bind (pos smatrix) pos-smatrix
-				    (insert-matrix-sparse initial smatrix pos)
-				    ))
+				    (insert-matrix-sparse initial smatrix pos)))
 				row-operation
 				:initial-value initial-matrix))
 		      (append 
@@ -493,33 +522,42 @@
 				   (range-get 0 time-horizon)))
 			  (make-list  time-horizon :initial-element (nth 2 state-limits))
 			  )))
-      (list A L U))
+      (list A
+	    (alexandria:flatten L)
+	    (alexandria:flatten U)))
     ))
 
 
 
-(list-matrix->csc-list
- (car 
-  (get-a-l-u-matrix 2 '((67 2) (3 4)) '((7 6)) '(a b) '(3 4) '(c) '((-10) (10))
-		    (state-limit-symbolic->list '(a b)
-						-1
-						'((+ ( * 2  a) b))
-						10)
-		    )
-  ))
+;; (list-matrix->csc-list
+;;  (car 
+;;   (get-a-l-u-matrix 2
+;; 		    '((67 2) (3 4))
+;; 		    '((7 6))
+;; 		    '(a b)
+;; 		    '(3 4)
+;; 		    '(c d)
+;; 		    '((-10 -40) (10 40))
+;; 		    (state-limit-symbolic->list '(a b)
+;; 						'(c d)
+;; 						'(-1 -2)
+;; 						'((+ ( * 2  a) b c)
+;; 						  (+ a b d))
+;; 						'(10 -11)))
+;;   ))
 
 ;; (get-sparse-a-l-u 2 '(((67 2) (3 4)))
 ;; 		  '(((7 6)))
 ;; 		  '(a b)
 ;; 		  '(3 4)
-;; 		  '(c)
-;; 		  '((-10) (10))
+;; 		  '(c d)
+;; 		  '((-10 -40) (10 40))
 ;; 		  (state-limit-symbolic->list '(a b)
-;; 					      -1
-;; 					      '((+ ( * 2  a) b))
-;; 					      10))
-
-
+;; 					      '(c d)
+;; 					      '(-1 -2)
+;; 					      '((+ ( * 2  a) b c)
+;; 						(+ a b d))
+;; 					      '(10 -11)))
 
 ;; (MAT-CONSTANT-MUL -1 '(67 2))
 
