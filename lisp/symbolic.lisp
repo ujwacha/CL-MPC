@@ -83,6 +83,14 @@
 		   ((eq (length filtered) 1) (car filtered))
 		   (t `(+ ,@filtered)))))
 
+
+	      ((eq symb '-)
+	       (let ((filtered (remove-if (lambda (x) (eq x 0)) args)))
+		 (cond 
+		   ((eq filtered nil) 0)
+		   ((eq (length filtered) 1) (car filtered))
+		   (t `(- ,@filtered)))))
+	      
 	      ((eq symb '*)
 	       (let ((filtered (remove-if (lambda (x) (eq x 1)) args)))
 		 (cond 
@@ -111,15 +119,23 @@
 
 
 
-(defun state-limit-symbolic->list (state-vector u inequality l)
+(defun state-limit-symbolic->list (state-vector control-vector u inequality l)
+  ;; do some verification to error out
+  (if (not (= (length u)
+	      (length inequality)
+	      (length l)))
+      (error "state-limit-symbolic->list error, dimentions of inputs don't match"))
+  
   (list u
-	(jacobian state-vector inequality)
+	(list 
+	 (jacobian state-vector inequality)
+	 (jacobian control-vector inequality)
+	 )
 	l))
 
-(state-limit-symbolic->list '(a b)
-			    -10
-			    '((+ a b))
-			    0)
+;; (state-limit-symbolic->list '(a b)
+;; 			    '(-10)
+;; 			    '((+ a b))
+;; 			    '(5))
 
-(jacobian '(a b)
-	  '((+ a b)))
+
