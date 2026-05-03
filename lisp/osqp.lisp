@@ -110,11 +110,39 @@
 						   (setf *mpc-solver-settings* 'nil)))
 
   (if (not (eq *mpc-solver* 'nil)) (progn (osqp-cleanup *mpc-solver*)
-					  (setf *mpc-solver* 'nil)))
-  )
+					  (setf *mpc-solver* 'nil))))
 
 
 (ALL-C-VARS-FREE)
+
+(defun set-mpc-settings (&key (max-iter 20000)
+                              (eps-abs 1e-2)
+                              (eps-rel 1e-2)
+                              (adaptive-rho 1)
+                              (adaptive-rho-interval 50)
+                              (rho 0.1)
+                              (sigma 1e-6)
+                              (polishing 0)
+                              (scaling 1)
+                              (verbose nil)
+                              (settings *mpc-solver-settings*))
+  (unless settings
+    (error "No settings object provided. Create one via (osqp-settings-new)."))
+
+  (osqp-set-default-settings settings)
+  ;; Direct slot modification using autowrap accessors
+  (setf (osqp-settings.max-iter settings) max-iter)
+  (setf (osqp-settings.eps-abs settings) (coerce eps-abs 'double-float))
+  (setf (osqp-settings.eps-rel settings) (coerce eps-rel 'double-float))
+  (setf (osqp-settings.adaptive-rho settings) (if adaptive-rho 1 0))
+  (setf (osqp-settings.adaptive-rho-interval settings) adaptive-rho-interval)
+  (setf (osqp-settings.rho settings) (coerce rho 'double-float))
+  (setf (osqp-settings.sigma settings) (coerce sigma 'double-float))
+  (setf (osqp-settings.polishing settings) (if polishing 1 0))
+  (setf (osqp-settings.scaling settings) (if scaling 1 0))
+  (setf (osqp-settings.verbose settings) (if verbose 1 0))
+  settings)
+
 
 (defun set-mpc-problem (dim p q a l u)
   (all-c-vars-free)
@@ -154,7 +182,8 @@
     (setf *mpc-solver-settings* (osqp-settings-new))
     (osqp-set-default-settings *mpc-solver-settings*)
 
-
+    (set-mpc-settings)
+    
     (autowrap:with-alloc (solver-ptr-ptr :pointer)
       (let ((exitflag (osqp-setup solver-ptr-ptr
 				  *p*

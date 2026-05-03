@@ -12,13 +12,13 @@
 (defparameter *states*   '(theta omega x v))
 (defparameter *controls* '(a s1))
 
-(defparameter *horizon* 35)
+(defparameter *horizon* 25)
 
 (defparameter *state-weights*
   '((40   0   0   0)
-    (0    0.5   0   0)
+    (0    0.01   0   0)
     (0    0   10   0)
-    (0    0   0   0.1)))
+    (0    0   0   0.01)))
 
 
 
@@ -28,20 +28,22 @@
 
 ;; Control limits  [a_min, a_max]
 (defparameter *control-limits*
-  '((-100.0 0)  (100.0 1000)))
+  '((-250.0 0)  (250.0 100)))
 
 (defparameter *state-limits* 'nil)
 
 (setq *state-limits*
-      (state-limit-symbolic->list
+      (state-limit-symbolic->list-func
        *states*
        *controls*
-       '(-1000
+       '(-100
 	 -0.5)
-       '((- theta s1)
+       '((+ theta (- s1))
 	 (+ theta s1))
        '(0.5
-	 1000)))
+	 100)))
+
+(funcall *state-limits*)
 
 ;; State transition (symbolic, delt/g/invr2 spliced in at load time)
 (defparameter *state-transition*
@@ -75,7 +77,7 @@
 (defparameter *initial-state* 'nil)
 (setf *initial-state* '(0.0 0 0 0))
 (defparameter *initial-control* 'nil)
-(setf *initial-control* '(0))
+(setf *initial-control* '(0 0))
 
 
 (defvar *initial-q* nil)
@@ -160,19 +162,16 @@
   (loop for i from 0 below n
 	do
 	   (destructuring-bind (new-state state-jacs control-jacs) (run-mpc-once)
-	     (destructuring-bind (a-upd l-upd u-upd)  (get-sparse-a-l-u
-						       *horizon*
-						       state-jacs
-						       control-jacs
-						       *states*
-						       new-state
-						       *controls*
-						       *control-limits*
-						       *state-limits*)
-	       (mpc-matrix-update-alu a-upd l-upd u-upd)
-	       ))))
-
-
+	     (destructuring-bind (a-upd l-upd u-upd)
+		 (get-sparse-a-l-u *horizon*
+				   state-jacs
+				   control-jacs
+				   *states*
+				   new-state
+				   *controls*
+				   *control-limits*
+				   (funcall *state-limits*))
+	       (mpc-matrix-update-alu a-upd l-upd u-upd)))))
 
 
 (defun initialize-mpc-system ()
@@ -183,7 +182,7 @@
   (setf *initial-p*
 	(crc-to-function-helper (list-matrix->upper-tirangular-csc-list
 				 (get-p *horizon* *state-weights* *control-weights*))))
-
+  (print "Here")
   
   (setf *current-alu*
 	(let ((current-state-jacobian
@@ -197,8 +196,10 @@
 			    *initial-state*
 			    *controls*
 			    *control-limits*
-			    *state-limits*)))
+			    (funcall *state-limits*))))
 
+  
+  
   (destructuring-bind (a l u) *current-alu*
     (setf *current-a* a)
     (setf *current-l* l)
@@ -218,21 +219,12 @@
     (print "setting up mpc problem")
     (print m)
     (print n)
-    (set-mpc-problem dim p q a l u))
+    (set-mpc-problem dim p q a l u)
+    ;;    a
+    )
 
   (run-mpc-once)
   (try-converge-non-linear *horizon*))
-
-
-;; (mpc-matrix-update-p (nth 3 (list-matrix->csc-list (get-p *horizon* *state-weights* *control-weights*))))
-
-
-(setf *state-weights*
-      '((30   0   0   0)
-       (0    0.5   0   0)
-       (0    0   5   0)
-       (0    0   0   0.1)))
-
 
 (initialize-mpc-system)
 
@@ -269,7 +261,7 @@
 				      next-state
 				      *controls*
 				      *control-limits*
-				      *state-limits*))
+				      (funcall *state-limits*)))
 	   )
       (destructuring-bind (a-mat l-vec u-vec ) new-alu
 	(mpc-matrix-update-alu a-mat l-vec u-vec))
@@ -315,12 +307,21 @@
 				      next-state
 				      *controls*
 				      *control-limits*
-				      *state-limits*)))
+				      (funcall *state-limits*))))
       
       (destructuring-bind (a-mat l-vec u-vec ) new-alu
 	(mpc-matrix-update-alu a-mat l-vec u-vec))
       (mpc-matrix-update-q planned-traj)
-      (try-converge-non-linear 6)
+
+      (handler-case 
+	  (try-converge-non-linear 10)
+	(error (c)
+	  (print "convergence error")
+	  (setf *initial-state* (read-udp-message))
+	  (setf *initial-control* '(0 0))
+	  (initialize-mpc-system)
+	  (try-converge-non-linear 18)
+	  ))
       (list states controls))))
 
 
@@ -333,6 +334,7 @@
 
 (send-socket-data (floats->bytes '(-0.00)))
 
+;;(setf *message-recieve-thread* nil)
 (kill-recieve-thread)
 (make-recieve-theread)
 (read-udp-message)
@@ -342,7 +344,7 @@
 	 (setf *initial-state* (read-udp-message)))
 (setf *initial-state* (read-udp-message))
 
-(setf *initial-control* '(0))
+(setf *initial-control* '(0 0))
 
 (initialize-mpc-system)
 (try-converge-non-linear *horizon*)
@@ -365,7 +367,22 @@
 	       (let ((this-state (read-udp-message)))
 		 (print "state: ")
 		 (print this-state)
-		 (mpc-next-goto-from this-state *my-obj*)
+		 (handler-case (mpc-next-goto-from this-state *my-obj*)
+		   (error (c)
+		     ;; re initialize if we get an error
+		     (print "We just got an error")
+		     (setf *initial-state* (read-udp-message))
+		     (setf *initial-control* '(0 0))
+		     (initialize-mpc-system)
+		     (try-converge-non-linear *horizon*)
+		     
+		     `(,(loop for i from 0 to *horizon*
+			      collect
+			      this-state)
+		       ,(loop for i from 0 to *horizon*
+			      collect
+			      '(0.0 0.0))))
+		   )
 		 )
 	     (print "control: ")
 	     (print (car predicted-control))
@@ -373,7 +390,7 @@
 	     (if (> (car (car  predicted-control)) 100000)
 		 (error "we got bad value"))
 	     (send-socket-data (floats->bytes
-				(car predicted-control)))
+				(list (car (car predicted-control)))))
 	     )
 	   (sleep 0.02)
 
@@ -381,7 +398,12 @@
 
 (setf *run-stuff* 1)
 
-(mpc-loop)
+(progn
+  (setf *initial-state* (read-udp-message))
+  (setf *initial-control* '(0 0))
+  (initialize-mpc-system)
+  (try-converge-non-linear *horizon*)
+  (mpc-loop))
 
 (all-c-vars-free)
 
@@ -390,27 +412,13 @@
 (defvar *mpc-loop-thread* nil)
 
 
-(socket-clean)
-(kill-recieve-thread)
-(setf *message-recieve-thread* nil)
-
-;; *state-weights*
-;; (setf *my-obj* '(0 0 2 0))
+;; (socket-clean)
+;; (kill-recieve-thread)
 
 
-;; (mpc-matrix-update-q 
-
-;;  (trajectory-to-state-q '(0 0 25 0)
-;; 			'(0 0 5 
 
 
-;; (setf *state-limits*
-;;       (state-limit-symbolic->list
-;;        *states*
-;;        -1.1
-;;        '((+ theta))
-;;        +1.1))
 
 
-;; (setf *control-limits*
-;;       '((-200.0) (200.0)))
+
+

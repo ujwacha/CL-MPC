@@ -121,6 +121,14 @@ try:
         v     += a * DT
         t     += DT
 
+        if v >= 300 or abs(x) > 150 or abs(omega) >= 50:
+            x = 0
+            theta = 0.1
+            v = 0
+            omega = 0
+            
+            
+        
         # ── Render ───────────────────────────────────────────────────
         update_plot(theta, omega, x, v, t)
         plt.pause(DT)

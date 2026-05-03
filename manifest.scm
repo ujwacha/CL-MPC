@@ -34,6 +34,7 @@
    cl-usocket
    cl-bordeaux-threads
    cl-nibbles
+   cl-eazy-gnuplot
 
    ;; python
    python-websockets

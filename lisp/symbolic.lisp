@@ -84,13 +84,6 @@
 		   (t `(+ ,@filtered)))))
 
 
-	      ((eq symb '-)
-	       (let ((filtered (remove-if (lambda (x) (eq x 0)) args)))
-		 (cond 
-		   ((eq filtered nil) 0)
-		   ((eq (length filtered) 1) (car filtered))
-		   (t `(- ,@filtered)))))
-	      
 	      ((eq symb '*)
 	       (let ((filtered (remove-if (lambda (x) (eq x 1)) args)))
 		 (cond 
@@ -118,6 +111,17 @@
 
 
 
+(defun state-limits-generator-lambda (state-limits-output)
+  (destructuring-bind (l matrices u) state-limits-output
+    (destructuring-bind (state-part control-part) matrices
+      `(lambda ()
+	 (list
+	  (list ,@l)
+	  (list
+	   (list ,@(mapcar (lambda (col) (cons 'list col)) state-part))
+	   (list ,@(mapcar (lambda (col) (cons 'list col)) control-part)))
+	  (list ,@u))))))
+
 
 (defun state-limit-symbolic->list (state-vector control-vector u inequality l)
   ;; do some verification to error out
@@ -133,9 +137,17 @@
 	 )
 	l))
 
-;; (state-limit-symbolic->list '(a b)
-;; 			    '(-10)
-;; 			    '((+ a b))
-;; 			    '(5))
 
+(defun state-limit-symbolic->list-func (state-vector
+					control-vector
+					u
+					inequality
+					l)
+  (compile nil
+	   (state-limits-generator-lambda (state-limit-symbolic->list
+					   state-vector
+					   control-vector
+					   u
+					   inequality
+					   l))))
 

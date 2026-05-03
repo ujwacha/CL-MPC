@@ -242,8 +242,8 @@
 					     (pos-control-lim (list (+ n
 								       (* i (length (car state-limits))))
 								    (+
-								     (* (1+ i) state-len)
-								     (* time-horizon state-len)
+								     (* (1+ time-horizon) state-len)
+								     (* i control-len)
 								     ))))
 					 (list 
 					  (list pos-state-lim state-part-limit)
@@ -468,8 +468,8 @@
 					     (pos-control-lim (list (+ n
 								       (* i (length (car state-limits))))
 								    (+
-								     (* (1+ i) state-len)
-								     (* time-horizon state-len)
+								     (* (1+ time-horizon) state-len)
+								     (* i control-len)
 								     ))))
 					 (list
 					  (list (list pos-state-lim state-part-limit))
@@ -529,35 +529,38 @@
 
 
 
-;; (list-matrix->csc-list
-;;  (car 
-;;   (get-a-l-u-matrix 2
-;; 		    '((67 2) (3 4))
-;; 		    '((7 6))
-;; 		    '(a b)
-;; 		    '(3 4)
-;; 		    '(c d)
-;; 		    '((-10 -40) (10 40))
-;; 		    (state-limit-symbolic->list '(a b)
-;; 						'(c d)
-;; 						'(-1 -2)
-;; 						'((+ ( * 2  a) b c)
-;; 						  (+ a b d))
-;; 						'(10 -11)))
-;;   ))
+(list-matrix->csc-list
+ (car 
+  (get-a-l-u-matrix 4
+		    '((67 2) (3 4))
+		    '((7 6) (5 7))
+		    '(a b)
+		    '(3 4)
+		    '(c d)
+		    '((-10 -40) (10 40))
+		    (state-limit-symbolic->list '(a b)
+						'(c d)
+						'(-1 -2)
+						'((+ ( * 2  a) b c)
+						  (+ a b d))
+						'(10 -11)))
+  ))
 
-;; (get-sparse-a-l-u 2 '(((67 2) (3 4)))
-;; 		  '(((7 6)))
-;; 		  '(a b)
-;; 		  '(3 4)
-;; 		  '(c d)
-;; 		  '((-10 -40) (10 40))
-;; 		  (state-limit-symbolic->list '(a b)
-;; 					      '(c d)
-;; 					      '(-1 -2)
-;; 					      '((+ ( * 2  a) b c)
-;; 						(+ a b d))
-;; 					      '(10 -11)))
+(get-sparse-a-l-u 2
+		  '(((67 2) (3 4)))
+		  '(((7 6) (5 7)))
+		  '(a b)
+		  '(3 4)
+		  '(c d)
+		  '((-10 -40) (10 40))
+		  (state-limit-symbolic->list '(a b)
+					      '(c d)
+					      '(-1 -2)
+					      '((+ ( * 2  a) b c)
+						(+ a b d))
+					      '(10 -11)))
+
+
 
 ;; (MAT-CONSTANT-MUL -1 '(67 2))
 
